@@ -1,0 +1,70 @@
+# ── Python ──
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyc
+*.py.class
+*.egg-info/
+dist/
+build/
+
+# ── Cython build artifacts ──
+*.pyd
+*.exp
+*.lib
+*.obj
+*.c
+*.so
+
+# ── Virtual environments ──
+venv/
+.venv/
+env/
+.env/
+virtualenv/
+
+# ── Testing ──
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+
+# ── OS files ──
+Thumbs.db
+Thumbs.db:encryptable
+Desktop.ini
+.DS_Store
+*.swp
+*.swo
+*~
+
+# ── IDE / editors ──
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.code-workspace
+
+# ── Dev tooling (local, not part of the project) ──
+.opencode/
+.specify/
+AGENTS.md
+
+# ── Design specs ──
+specs/
+
+# ── Local config & secrets ──
+*.local
+*.secret
+.env.local
+.env.*.local
+
+# ── Logs ──
+*.log
+logs/
+
+# ── Docker ──
+.docker/
+
+# ── Project-specific ──
+*.db

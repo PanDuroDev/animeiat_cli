@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=68.0", "cython>=3.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "animeiat-cli"
+version = "0.1.0"
+description = "Stream & Play anime from the terminal — multi-provider, multi-platform"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [
+    {name = "animeiat-cli contributors"},
+]
+keywords = ["anime", "streaming", "cli", "terminal", "player"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Multimedia :: Video",
+]
+
+dependencies = [
+    "rich>=13.0.0",
+    "httpx>=0.24.0",
+    "beautifulsoup4>=4.11.0",
+    "lxml>=4.9.0",
+    "playwright>=1.30.0",
+    "pycryptodome>=3.15.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/PanDuroDev/animeiat_cli"
+Repository = "https://github.com/PanDuroDev/animeiat_cli"
+Issues = "https://github.com/PanDuroDev/animeiat_cli/issues"
+
+[project.scripts]
+animeiat-cli = "src.ui.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["src", "src.*"]
