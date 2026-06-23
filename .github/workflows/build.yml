@@ -1,0 +1,148 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+      - name: Run build check
+        run: python build/build.py --check
+
+  build:
+    needs: check
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: ${{ matrix.os == 'windows-latest' && 'pwsh' || 'bash' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/ms-playwright
+            ~/Library/Caches/ms-playwright
+            %USERPROFILE%\AppData\Local\ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Install Playwright browsers
+        run: |
+          pip install playwright
+          python -m playwright install chromium
+          python -m playwright install --with-deps chromium
+        continue-on-error: true
+
+      - name: Build (onedir — default)
+        run: python build/build.py
+
+      - name: Build (onefile — standalone)
+        run: python build/build.py --onefile
+
+      - name: Validate onedir build
+        run: |
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            ./dist/animeiat-cli/animeiat-cli.exe --version
+          else
+            ./dist/animeiat-cli/animeiat-cli --version
+          fi
+        shell: bash
+
+      - name: Validate onefile build
+        run: |
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            ./dist/animeiat-cli.exe --version
+          else
+            ./dist/animeiat-cli --version
+          fi
+        shell: bash
+
+      - name: Upload onedir artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: animeiat-cli-${{ runner.os }}-onedir
+          path: |
+            dist/animeiat-cli/
+          compression-level: 0
+
+      - name: Upload onefile artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: animeiat-cli-${{ runner.os }}-onefile
+          path: |
+            dist/animeiat-cli.exe
+            dist/animeiat-cli
+          compression-level: 0
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: animeiat-cli-*
+          merge-multiple: true
+
+      - name: Package artifacts
+        run: |
+          mkdir -p release-artifacts
+          for dir in */; do
+            platform="${dir%/}"
+            case "$platform" in
+              *Windows*) suffix="windows" ;;
+              *macOS*)   suffix="macos" ;;
+              *Linux*)   suffix="linux" ;;
+              *)         continue ;;
+            esac
+            if [ -f "$platform/animeiat-cli.exe" ]; then
+              cd "$platform"
+              zip -r "../release-artifacts/animeiat-cli-${suffix}-onefile.zip" "animeiat-cli.exe"
+              cd ..
+            elif [ -f "$platform/animeiat-cli" ]; then
+              cd "$platform"
+              tar czf "../release-artifacts/animeiat-cli-${suffix}-onefile.tar.gz" "animeiat-cli"
+              cd ..
+            fi
+          done
+
+      - name: Upload to Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ github.ref_name }}" release-artifacts/* --clobber
