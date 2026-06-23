@@ -1,5 +1,9 @@
 # animeiat-cli
 
+<p align="center">
+  <a href="README.ar.md">العربية</a> &nbsp;|&nbsp; <strong>English</strong>
+</p>
+
 A terminal application for searching and playing anime episodes from multiple web providers.
 
 ![License](https://img.shields.io/github/license/PanDuroDev/animeiat_cli?style=for-the-badge)
