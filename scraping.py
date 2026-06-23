@@ -1678,21 +1678,29 @@ async def scrape_multiple_streams_async(ep_items, is_witanime, active_cookies):
 async def _scrape_one_stream_playwright(ep_item, is_witanime, active_cookies=None):
     """Playwright fallback for single-stream scraping. Returns stream URL or None."""
     from playwright.async_api import async_playwright
-    try:
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(
-                headless=True,
-                args=[
-                    "--disable-blink-features=AutomationControlled",
-                    "--no-sandbox",
-                    "--disable-gpu",
-                ]
-            )
-            results = {}
-            status = {}
-            await scrape_one_stream_async(browser, ep_item, is_witanime, active_cookies, results, status)
-            await browser.close()
-            ep_num = ep_item["episode"]
-            return results.get(ep_num)
-    except Exception:
-        return None
+
+    for attempt in range(2):
+        try:
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(
+                    headless=True,
+                    args=[
+                        "--disable-blink-features=AutomationControlled",
+                        "--no-sandbox",
+                        "--disable-gpu",
+                    ]
+                )
+                results = {}
+                status = {}
+                await scrape_one_stream_async(browser, ep_item, is_witanime, active_cookies, results, status)
+                await browser.close()
+                ep_num = ep_item["episode"]
+                return results.get(ep_num)
+        except Exception:
+            if attempt == 0:
+                from src.chromium import ensure_chromium
+                ensure_chromium()
+                continue
+            return None
+
+    return None
