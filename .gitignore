@@ -6,7 +6,18 @@ __pycache__/
 *.py.class
 *.egg-info/
 dist/
-build/
+build/pyinstaller-work/
+build/*.exe
+build/*.tar
+build/release-payload/
+build/outputs/
+build/.bootstrap/
+build/wrapper/
+build/.build-venv/
+build/.toolchain_cache.json
+
+# Ignore generated spec files at project root only
+/*.spec
 
 # ── Cython build artifacts ──
 *.pyd
@@ -65,6 +76,9 @@ logs/
 
 # ── Docker ──
 .docker/
+
+# ── PyInstaller build artifacts ──
+*.manifest
 
 # ── Project-specific ──
 *.db

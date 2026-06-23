@@ -4,23 +4,26 @@
   <a href="README.ar.md">العربية</a> &nbsp;|&nbsp; <strong>English</strong>
 </p>
 
-A terminal application for searching and playing anime episodes from multiple web providers.
+A terminal application for searching and playing anime episodes from multiple web providers. No ads. No browser needed.
 
 ![License](https://img.shields.io/github/license/PanDuroDev/animeiat_cli?style=for-the-badge)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue?style=for-the-badge)
 ![Platform](https://img.shields.io/badge/platform-windows%20%7C%20macos%20%7C%20linux-lightgrey?style=for-the-badge)
+[![Latest Release](https://img.shields.io/github/v/release/PanDuroDev/animeiat_cli?style=for-the-badge)](https://github.com/PanDuroDev/animeiat_cli/releases)
 
 ## Table of Contents
 
 - [For End Users](#for-end-users)
   - [What It Does](#what-it-does)
   - [Before You Start](#before-you-start)
-  - [Quick Install](#quick-install)
+  - [Download Prebuilt Binary](#download-prebuilt-binary)
+  - [Quick Install (from source)](#quick-install-from-source)
   - [How to Use It](#how-to-use-it)
   - [Troubleshooting](#troubleshooting)
 - [For Developers](#for-developers)
   - [Requirements](#requirements)
   - [Installation](#installation)
+  - [Build System](#build-system)
   - [CLI Reference](#cli-reference)
   - [Configuration](#configuration)
   - [Project Structure](#project-structure)
@@ -49,24 +52,36 @@ Key capabilities:
 You need:
 
 - **A computer** running Windows, macOS, or Linux.
-- **Python** version 3.10 or newer installed on your system.
+- **Python 3.10+** (if running from source) or just download the prebuilt binary.
 - **A media player** such as VLC or MPV. The app will detect one automatically.
 - **Chrome or Edge browser** (optional) — used only to extract cookies for provider access. The app does not read personal data.
 
 If you are not sure how to install Python, download it from [python.org](https://www.python.org/downloads/) and check the box that says "Add Python to PATH" during installation (Windows) or use your system package manager (macOS/Linux).
 
-### Quick Install
+### Download Prebuilt Binary
+
+Prebuilt executables are available on the [Releases page](https://github.com/PanDuroDev/animeiat_cli/releases). Download the one for your platform:
+
+| Platform | File | Notes |
+|----------|------|-------|
+| Windows | `animeiat-cli-windows.zip` | Extract and run `animeiat-cli.exe` |
+| macOS | `animeiat-cli-macos.tar.gz` | Intel & ARM |
+| Linux | `animeiat-cli-linux.tar.gz` | x86_64 |
+
+No Python installation required. Just download, extract, and run.
+
+### Quick Install (from source)
 
 1. **Install Python and a media player** (see [Before You Start](#before-you-start) above).
 
-2. **Download the project.** Click the green "Code" button on the [GitHub page](https://github.com/PanDuroDev/animeiat_cli) and select "Download ZIP", then extract it. Or use Git:
+2. **Download the project:**
 
    ```bash
    git clone https://github.com/PanDuroDev/animeiat_cli.git
    cd animeiat_cli
    ```
 
-3. **Install the required Python packages.** Open a terminal (Command Prompt on Windows, Terminal on macOS/Linux) in the project folder and run:
+3. **Install dependencies:**
 
    ```bash
    pip install -r requirements.txt
@@ -74,27 +89,23 @@ If you are not sure how to install Python, download it from [python.org](https:/
 
    If this fails, try `pip3` instead of `pip`, or run `python -m pip install -r requirements.txt`.
 
-4. **Install the Playwright browser component** (needed for cookie-based provider access):
+4. **Install Playwright Chromium:**
 
    ```bash
    playwright install chromium
    ```
 
-   On Linux you may need to run `playwright install --with-deps chromium` to install system libraries.
+   On Linux: `playwright install --with-deps chromium`.
 
-5. **Run the application:**
+5. **Run:**
 
    ```bash
    python anime_cli.py
    ```
 
-   Use `python3` on macOS and Linux if `python` is not found.
-
-The app will attempt to auto-install any missing dependencies on first run. If `playwright install chromium` succeeds, everything is ready.
+   Use `python3` on macOS/Linux if `python` is not found.
 
 #### Docker
-
-If you have Docker installed, you can skip the manual setup:
 
 ```bash
 docker build -t animeiat-cli .
@@ -163,7 +174,7 @@ Runtime dependencies (installed via `pip install -r requirements.txt`):
 | `rich` | Terminal UI rendering |
 | `httpx` | HTTP client for provider API calls |
 | `beautifulsoup4` + `lxml` | HTML parsing |
-| `playwright` | Browser cookie extraction |
+| `playwright` | Browser automation & cookie extraction |
 | `pycryptodome` | Cookie decryption |
 | `keyring` | Cookie key fallback on macOS/Linux (optional) |
 
@@ -177,11 +188,84 @@ playwright install chromium
 python anime_cli.py
 ```
 
-On Linux, if `playwright install chromium` fails, run:
+On Linux, if `playwright install chromium` fails:
 
 ```bash
 playwright install --with-deps chromium
 ```
+
+### Build System
+
+The project uses **PyInstaller** to create standalone executables.  
+No C compiler, no Cython, no manual runtime bundling needed.
+
+#### Quick Start
+
+```bash
+# Install build dependencies
+pip install pyinstaller
+
+# Build (default: onedir + bundled Chromium)
+python build/build.py
+
+# Build as single executable file
+python build/build.py --onefile
+
+# Build without Chromium (downloads on first run)
+python build/build.py --lite
+
+# Check build environment
+python build/build.py --check
+
+# Clean previous build artifacts
+python build/build.py --clean
+```
+
+#### Build Options
+
+| Flag | Output | Chromium | Use Case |
+|------|--------|----------|----------|
+| *(default)* | `dist/animeiat-cli/` (folder) | Bundled (~170MB) | Fast launch, stable Playwright |
+| `--onefile` | `dist/animeiat-cli.exe` (single file) | Bundled (~900MB) | Easy distribution |
+| `--lite` | `dist/animeiat-cli-lite/` (folder) | Downloaded on first run (~30MB) | Small download size |
+| `--clean` | — | — | Remove `dist/` and build cache |
+
+The build script:
+1. Detects your OS (Windows / macOS / Linux)
+2. Installs PyInstaller if missing (`pip install pyinstaller`)
+3. Downloads Chromium via Playwright (unless `--lite`)
+4. Runs PyInstaller with the spec file (`build/animeiat-cli.spec`)
+5. Validates the output by running `--version` on the built executable
+
+#### Cross-Platform
+
+No cross-compilation. Build on each target platform separately:
+
+```bash
+# Windows
+python build\build.py
+
+# macOS / Linux
+python build/build.py
+```
+
+Each platform produces a native executable with no external Python dependencies.
+
+#### How It Works
+
+```
+build/
+├── build.py              # Build script (one command for all platforms)
+└── animeiat-cli.spec     # PyInstaller spec file (hidden imports, data files)
+```
+
+- `build/animeiat-cli.spec` defines what goes into the executable: all `src/` modules, lxml, Cryptodome, Playwright, Chromium browser.
+- `build/build.py` orchestrates the entire process: dependency check, Chromium download, PyInstaller execution, post-build validation.
+
+#### CI/CD
+
+Prebuilt binaries for all platforms are available on the [Releases page](https://github.com/PanDuroDev/animeiat_cli/releases).  
+Each release is built via GitHub Actions using `python build/build.py --onefile`.
 
 ### CLI Reference
 
@@ -225,33 +309,44 @@ Available keys:
 
 ```
 animeiat-cli/
-├── anime_cli.py              # Entry point — delegates to src/
-├── requirements.txt          # Python package dependencies
-├── pyproject.toml            # Project metadata (PEP 621)
-├── setup.py                  # Cython build configuration
-├── Dockerfile                # Container build
+├── anime_cli.py              # Entry point — auto-installs deps, delegates to src/
+├── build/
+│   ├── build.py              # Build script (PyInstaller wrapper, one command)
+│   └── animeiat-cli.spec     # PyInstaller spec file
 ├── src/
+│   ├── chromium.py           # Chromium auto-install helper
 │   ├── ui/
-│   │   ├── tui.py            # Interactive terminal UI (Rich-based)
+│   │   ├── __init__.py       # UI exports
+│   │   ├── tui.py            # Interactive TUI (Rich-based, ~2400 lines)
 │   │   └── cli.py            # CLI argument parsing and routing
 │   ├── providers/
+│   │   ├── __init__.py       # Provider registry
 │   │   ├── witanime.py       # Witanime provider
 │   │   ├── anineko.py        # Anineko provider
 │   │   └── anime3rb.py       # Anime3rb provider
 │   ├── playback/
-│   │   ├── discovery.py      # Player detection and installation
-│   │   ├── launch.py         # Player process launch (VLC, MPV, IINA, etc.)
+│   │   ├── __init__.py       # Playback interface
+│   │   ├── discovery.py      # Player detection (VLC, MPV, IINA, etc.)
+│   │   ├── launch.py         # Player process launch
 │   │   └── progress.py       # Playback progress polling via IPC
 │   ├── cache/
+│   │   ├── __init__.py       # Cache interface
 │   │   └── stream_cache.py   # SQLite-backed stream URL cache
 │   ├── config/
-│   │   └── __init__.py       # Config file read/write, theme, icon helpers
+│   │   └── __init__.py       # Config read/write, theme, icons
 │   └── db/
-│       └── __init__.py       # SQLite database layer (accounts, favorites, history)
-├── scraping.py               # Legacy scraper (deprecated — import src.providers instead)
-├── config.py                 # Legacy re-export (deprecated)
-├── db.py                     # Legacy re-export (deprecated)
-└── player.py                 # Legacy re-export (deprecated)
+│       └── __init__.py       # SQLite DB: accounts, favorites, history, downloads
+├── scraping.py               # Legacy scraper (deprecated — uses src/providers)
+├── config.py                 # Legacy re-export (deprecated → src/config)
+├── db.py                     # Legacy re-export (deprecated → src/db)
+├── player.py                 # Legacy re-export (deprecated → src/playback)
+├── requirements.txt          # Python package dependencies
+├── pyproject.toml            # Project metadata (PEP 621)
+├── setup.py                  # Legacy Cython build (deprecated — use build/build.py)
+├── Dockerfile                # Container build
+├── CHANGELOG.md              # Release notes
+├── CONTRIBUTING.md           # Contribution guidelines
+└── LICENSE                   # MIT license
 ```
 
 ### Contributing
@@ -265,10 +360,23 @@ playwright install chromium
 pytest tests/ -v
 ```
 
-All 74 tests must pass before submitting a pull request. See [CONTRIBUTING.md](./CONTRIBUTING.md) for detailed guidelines on branching, code style, and PR workflow.
+All tests must pass before submitting a pull request. See [CONTRIBUTING.md](./CONTRIBUTING.md) for detailed guidelines on branching, code style, and PR workflow.
+
+#### Development Resources
+
+- [Project Board](https://github.com/PanDuroDev/animeiat_cli/projects) — track progress and planned features
+- [Issues](https://github.com/PanDuroDev/animeiat_cli/issues) — report bugs or suggest features
+- [Discussions](https://github.com/PanDuroDev/animeiat_cli/discussions) — ask questions and share ideas
+- [CHANGELOG.md](./CHANGELOG.md) — what changed in each release
 
 ---
 
 ## License
 
 [MIT](./LICENSE)
+
+---
+
+<p align="center">
+  <a href="README.ar.md">العربية</a> &nbsp;|&nbsp; <strong>English</strong>
+</p>
