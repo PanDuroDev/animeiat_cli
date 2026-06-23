@@ -1,234 +1,270 @@
 # animeiat-cli
 
-**Stream & Play anime from the terminal.**
+A terminal application for searching and playing anime episodes from multiple web providers.
 
-An interactive TUI (Terminal User Interface) application for searching, browsing, and playing anime episodes from multiple providers. Built with Python and [Rich](https://github.com/Textualize/rich).
+![License](https://img.shields.io/github/license/PanDuroDev/animeiat_cli?style=for-the-badge)
+![Python](https://img.shields.io/badge/python-3.10%2B-blue?style=for-the-badge)
+![Platform](https://img.shields.io/badge/platform-windows%20%7C%20macos%20%7C%20linux-lightgrey?style=for-the-badge)
+
+## Table of Contents
+
+- [For End Users](#for-end-users)
+  - [What It Does](#what-it-does)
+  - [Before You Start](#before-you-start)
+  - [Quick Install](#quick-install)
+  - [How to Use It](#how-to-use-it)
+  - [Troubleshooting](#troubleshooting)
+- [For Developers](#for-developers)
+  - [Requirements](#requirements)
+  - [Installation](#installation)
+  - [CLI Reference](#cli-reference)
+  - [Configuration](#configuration)
+  - [Project Structure](#project-structure)
+  - [Contributing](#contributing)
+- [License](#license)
 
 ---
 
-## Features
+## For End Users
 
-- **Multi-provider**: Anime3rb, Witanime, Anineko, HiAnime, 9Anime
-- **Interactive TUI**: Search, browse, select episodes with keyboard navigation
-- **Smooth animations**: Terminal-native scroll transitions (no `time.sleep()`)
-- **Multi-player**: VLC, MPV, IINA (macOS), Celluloid, Haruna
-- **Playback tracking**: Resume from where you left off
-- **Cookie extraction**: Auto-extract from Chrome/Edge for provider access
-- **Favorites & Continue Watching**: Persistent watch history
-- **Download manager**: Queue episodes for download
-- **Stream caching**: Configurable TTL cache for resolved URLs
-- **Multi-platform**: Windows, macOS, Linux
-- **Docker**: Ready-to-run container image
-- **AniList / MyAnimeList**: Account linking (scaffolding)
+### What It Does
 
----
+animeiat-cli is a program that runs in your terminal (command prompt) and lets you search for anime, browse episodes, and play them in your preferred media player. It pulls episode data from multiple anime websites, so you do not need to open a browser or deal with ads.
 
-## Quick Start
+Key capabilities:
 
-### Requirements
+- Search anime by name across multiple source websites.
+- Browse episode lists with keyboard navigation.
+- Play episodes directly in VLC, MPV, or another installed media player.
+- Pick up where you left off — watch history is saved locally.
+- Bookmark shows as favorites or download episodes for offline viewing.
+- All data stays on your machine. No account required.
 
-- **Python** 3.10 or later
-- One of: **VLC**, **MPV**, **IINA** (macOS), **Celluloid**, or **Haruna**
+### Before You Start
 
-### Install
+You need:
 
-```bash
-# 1. Clone the repo
-git clone https://github.com/PanDuroDev/animeiat_cli.git
-cd animeiat_cli
+- **A computer** running Windows, macOS, or Linux.
+- **Python** version 3.10 or newer installed on your system.
+- **A media player** such as VLC or MPV. The app will detect one automatically.
+- **Chrome or Edge browser** (optional) — used only to extract cookies for provider access. The app does not read personal data.
 
-# 2. Install Python dependencies
-pip install -r requirements.txt
+If you are not sure how to install Python, download it from [python.org](https://www.python.org/downloads/) and check the box that says "Add Python to PATH" during installation (Windows) or use your system package manager (macOS/Linux).
 
-# 3. Install Playwright browser (for cookie extraction)
-playwright install chromium
+### Quick Install
 
-# 4. Run
-python anime_cli.py
-```
+1. **Install Python and a media player** (see [Before You Start](#before-you-start) above).
 
-> The app will auto-install missing dependencies on first run.
+2. **Download the project.** Click the green "Code" button on the [GitHub page](https://github.com/PanDuroDev/animeiat_cli) and select "Download ZIP", then extract it. Or use Git:
 
-### Run with Docker
+   ```bash
+   git clone https://github.com/PanDuroDev/animeiat_cli.git
+   cd animeiat_cli
+   ```
+
+3. **Install the required Python packages.** Open a terminal (Command Prompt on Windows, Terminal on macOS/Linux) in the project folder and run:
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+   If this fails, try `pip3` instead of `pip`, or run `python -m pip install -r requirements.txt`.
+
+4. **Install the Playwright browser component** (needed for cookie-based provider access):
+
+   ```bash
+   playwright install chromium
+   ```
+
+   On Linux you may need to run `playwright install --with-deps chromium` to install system libraries.
+
+5. **Run the application:**
+
+   ```bash
+   python anime_cli.py
+   ```
+
+   Use `python3` on macOS and Linux if `python` is not found.
+
+The app will attempt to auto-install any missing dependencies on first run. If `playwright install chromium` succeeds, everything is ready.
+
+#### Docker
+
+If you have Docker installed, you can skip the manual setup:
 
 ```bash
 docker build -t animeiat-cli .
 docker run -it animeiat-cli
 ```
 
----
+### How to Use It
 
-## Installation Guides
+Run `python anime_cli.py` to start the interactive TUI (Terminal User Interface).
 
-### Windows
+The main menu shows these options:
 
-1. **Install Python 3.10+**
-   - Download from [python.org](https://www.python.org/downloads/)
-   - **Important**: Check "Add Python to PATH" during installation
+- **Search** — type an anime name to search across providers.
+- **URL** — paste a direct URL from a supported provider.
+- **Favorites** — browse your bookmarked shows.
+- **Continue Watching** — resume a show you started.
+- **Download Manager** — manage queued downloads.
+- **Settings** — change player, quality, appearance, and more.
+- **Exit** — quit the application.
 
-2. **Install a player** (pick one)
-   - [VLC](https://www.videolan.org/vlc/) — `winget install VideoLAN.VLC`
-   - [MPV](https://mpv.io/installation/) — `winget install mpv.net`
-   - Or via Chocolatey: `choco install vlc` / `choco install mpv`
+Use the arrow keys (Up/Down) to move through lists and press Enter to select. Press `d` to toggle a details panel on the right side of the screen. Press `Esc` to go back and `q` to quit.
 
-3. **Clone and install**
-   ```powershell
-   git clone https://github.com/anomalyco/animeiat-cli.git
-   cd animeiat-cli
-   pip install -r requirements.txt
-   playwright install chromium
-   python anime_cli.py
-   ```
+#### Non-interactive mode
 
-4. **Troubleshooting**
-   - If `playwright install chromium` fails, run PowerShell as Administrator and try again
-   - If you see encoding issues, your terminal must support UTF-8
-
----
-
-### macOS
-
-1. **Install Python 3.10+**
-   ```bash
-   brew install python@3.13
-   ```
-   Or download from [python.org](https://www.python.org/downloads/)
-
-2. **Install a player**
-   ```bash
-   brew install --cask vlc mpv iina
-   ```
-
-3. **Clone and install**
-   ```bash
-   git clone https://github.com/anomalyco/animeiat-cli.git
-   cd animeiat-cli
-   pip3 install -r requirements.txt
-   playwright install chromium
-   python3 anime_cli.py
-   ```
-
----
-
-### Linux (Debian / Ubuntu)
+You can also use the app without the TUI:
 
 ```bash
-# Python 3.10+ is usually pre-installed
-sudo apt update
-sudo apt install -y python3 python3-pip python3-venv mpv
+# Play a specific URL directly
+python anime_cli.py --url https://example.com/anime/... --no-tui
 
-# Clone and run
-git clone https://github.com/PanDuroDev/animeiat_cli.git
-cd animeiat_cli
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-playwright install chromium
-python3 anime_cli.py
+# List episodes as JSON
+python anime_cli.py --url https://... --list-episodes --json
+
+# Queue an episode for download
+python anime_cli.py --url https://... --download
+
+# Show version
+python anime_cli.py --version
 ```
 
-**Other distributions:**
+### Troubleshooting
 
-| Distro | Player install |
-|--------|---------------|
-| Fedora | `sudo dnf install mpv` |
-| Arch   | `sudo pacman -S mpv` |
-| openSUSE | `sudo zypper install mpv` |
-| Alpine | `sudo apk add mpv` |
-| Gentoo | `sudo emerge media-video/mpv` |
-| Void   | `sudo xbps-install -S mpv` |
+| Problem | Likely cause | Solution |
+|---------|-------------|----------|
+| `pip` is not recognized | Python not in PATH | Reinstall Python and check "Add Python to PATH". Restart your terminal. |
+| `playwright install chromium` fails | Missing system dependencies (Linux) | Run `playwright install --with-deps chromium` instead. |
+| "No player found" on startup | VLC or MPV not installed | Install one of the supported players. See [Before You Start](#before-you-start). |
+| App opens but no search results | Browser cookies not available | The app needs cookies from Chrome or Edge to access providers. Open the browser, visit the provider site once, then restart the app. |
+| TUI looks garbled or misaligned | Terminal font or size issue | Use a modern terminal (Windows Terminal, iTerm2, GNOME Terminal). Set the font to a monospace font. |
 
 ---
 
-## Usage
+## For Developers
 
-### Interactive mode (default)
+### Requirements
+
+- Python 3.10 or later.
+- Windows, macOS, or Linux.
+- One of: VLC, MPV, IINA (macOS only), Celluloid, Haruna.
+- Chrome or Edge (optional, for cookie extraction).
+
+Runtime dependencies (installed via `pip install -r requirements.txt`):
+
+| Package | Purpose |
+|---------|---------|
+| `rich` | Terminal UI rendering |
+| `httpx` | HTTP client for provider API calls |
+| `beautifulsoup4` + `lxml` | HTML parsing |
+| `playwright` | Browser cookie extraction |
+| `pycryptodome` | Cookie decryption |
+| `keyring` | Cookie key fallback on macOS/Linux (optional) |
+
+### Installation
 
 ```bash
+git clone https://github.com/PanDuroDev/animeiat_cli.git
+cd animeiat_cli
+pip install -r requirements.txt
+playwright install chromium
 python anime_cli.py
 ```
 
-Keyboard controls inside the TUI:
-- `↑`/`↓` — Navigate items
-- `Enter` — Select / Play
-- `d` — Toggle details panel
-- `Esc` — Go back
-- `q` — Quit
-
-### CLI mode
+On Linux, if `playwright install chromium` fails, run:
 
 ```bash
-# Play a specific URL
-python anime_cli.py --url https://anime3rb.com/... --no-tui
-
-# With preferred player
-python anime_cli.py --player mpv
-
-# List episodes (JSON output)
-python anime_cli.py --url https://... --list-episodes --json
-
-# Download an episode
-python anime_cli.py --url https://... --download
+playwright install --with-deps chromium
 ```
 
----
+### CLI Reference
 
-## Configuration
+| Flag | Short | Type | Default | Description |
+|------|-------|------|---------|-------------|
+| `--help` | `-h` | — | — | Show help message and exit |
+| `--player` | `-p` | string | `auto` | Preferred player: `auto`, `vlc`, `mpv`, `iina`, `celluloid`, `haruna` |
+| `--quality` | `-q` | string | `auto` | Stream quality: `auto`, `1080p`, `720p`, `480p`, `360p` |
+| `--url` | `-u` | string | — | Anime URL to play (overrides search) |
+| `--no-tui` | — | flag | `false` | Non-interactive mode: play and exit |
+| `--version` | `-V` | flag | `false` | Show version and exit |
+| `--json` | — | flag | `false` | JSON output (machine-readable, non-interactive mode) |
+| `--list-episodes` | — | flag | `false` | List all episodes and exit (non-interactive) |
+| `--download` | — | flag | `false` | Queue stream URL for download and exit |
 
-Config file location:
-- **Windows**: `%APPDATA%\animeiat_cli\config.json`
-- **macOS/Linux**: `~/.config/animeiat_cli/config.json`
+### Configuration
 
-Settings available:
-- Default player and quality
-- Preferred search sources
-- Custom player arguments (e.g., `--fullscreen --volume=80`)
-- Theme (customizable colors)
-- Stream cache TTL
+The config file is created automatically on first run. Location:
 
----
+| Platform | Path |
+|----------|------|
+| Windows | `%APPDATA%\animeiat_cli\config.json` |
+| macOS/Linux | `~/.config/animeiat_cli/config.json` |
 
-## Project Structure
+Available keys:
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `preferred_player` | string | `"auto"` | Media player to use. Options: `auto`, `vlc`, `mpv`, `iina`, `celluloid`, `haruna` |
+| `default_quality` | string | `"auto"` | Stream quality preference. Options: `auto`, `1080p`, `720p`, `480p`, `360p` |
+| `preferred_browser` | string | `"auto"` | Browser for cookie extraction: `auto`, `chrome`, `edge` |
+| `history_tracking` | bool | `true` | Enable or disable watch history |
+| `fullscreen` | bool | `true` | Launch media player in fullscreen mode |
+| `custom_player_args` | string | `""` | Extra CLI arguments passed to the media player (e.g. `--volume=80 --fs-screen=2`) |
+| `nerd_fonts` | bool | `false` | Enable Nerd Font icons in the TUI (requires a Nerd Font installed) |
+| `scraping_method` | string | `"auto"` | Scraping backend: `auto`, `playwright`, `httpx` |
+| `enabled_sources` | array | `[0, 1]` | Indices of enabled provider sources. Set in Settings > Search Sources |
+| `search_history` | array | `[]` | Recent search queries (max 5, managed automatically) |
+
+### Project Structure
 
 ```
 animeiat-cli/
-├── anime_cli.py          # Entry point
+├── anime_cli.py              # Entry point — delegates to src/
+├── requirements.txt          # Python package dependencies
+├── pyproject.toml            # Project metadata (PEP 621)
+├── setup.py                  # Cython build configuration
+├── Dockerfile                # Container build
 ├── src/
-│   ├── ui/               # TUI & CLI interface
-│   │   ├── tui.py        # Interactive terminal UI
-│   │   └── cli.py        # CLI argument parsing
-│   ├── providers/        # Anime source providers
-│   ├── playback/         # Player discovery & launch
-│   ├── cache/            # Stream URL caching
-│   ├── config/           # Configuration management
-│   └── db/               # SQLite database layer
-├── scraping.py           # Legacy scraping (deprecated)
-├── Dockerfile            # Container build
-└── requirements.txt      # Python dependencies
+│   ├── ui/
+│   │   ├── tui.py            # Interactive terminal UI (Rich-based)
+│   │   └── cli.py            # CLI argument parsing and routing
+│   ├── providers/
+│   │   ├── witanime.py       # Witanime provider
+│   │   ├── anineko.py        # Anineko provider
+│   │   └── anime3rb.py       # Anime3rb provider
+│   ├── playback/
+│   │   ├── discovery.py      # Player detection and installation
+│   │   ├── launch.py         # Player process launch (VLC, MPV, IINA, etc.)
+│   │   └── progress.py       # Playback progress polling via IPC
+│   ├── cache/
+│   │   └── stream_cache.py   # SQLite-backed stream URL cache
+│   ├── config/
+│   │   └── __init__.py       # Config file read/write, theme, icon helpers
+│   └── db/
+│       └── __init__.py       # SQLite database layer (accounts, favorites, history)
+├── scraping.py               # Legacy scraper (deprecated — import src.providers instead)
+├── config.py                 # Legacy re-export (deprecated)
+├── db.py                     # Legacy re-export (deprecated)
+└── player.py                 # Legacy re-export (deprecated)
 ```
 
----
+### Contributing
 
-## Development
+Development happens on the `develop` branch. To set up a development environment:
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup and guidelines.
-
-Tests live in the `develop` branch:
 ```bash
 git checkout develop
 pip install -r requirements.txt
+playwright install chromium
 pytest tests/ -v
 ```
+
+All 74 tests must pass before submitting a pull request. See [CONTRIBUTING.md](./CONTRIBUTING.md) for detailed guidelines on branching, code style, and PR workflow.
 
 ---
 
 ## License
 
 [MIT](./LICENSE)
-
----
-
-## Links
-
-- [GitHub Repository](https://github.com/PanDuroDev/animeiat_cli)
-- [Issue Tracker](https://github.com/PanDuroDev/animeiat_cli/issues)
