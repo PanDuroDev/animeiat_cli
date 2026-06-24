@@ -5,7 +5,7 @@
 ### Added
 - Initial open-source release.
 - Interactive TUI with Rich (search, browse, select episodes).
-- Multi-provider support: Anime3rb, Witanime, Anineko, HiAnime, 9Anime.
+- Multi-provider support: Anime3rb, Witanime
 - Browser cookie extraction (Chrome/Edge) for provider access.
 - Player support: VLC, MPV, IINA (macOS), Celluloid, Haruna.
 - Playback progress tracking with resume support.
