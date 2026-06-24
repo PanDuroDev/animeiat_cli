@@ -721,11 +721,13 @@ def interactive_select(options, title="Select Option", context_type=None, metada
 
     _right_panel_cache = {}
     _last_size = None
+    _last_size_time = 0.0
     _filter_active = False
     _filter_buf = ""
+    _cached_display = []
 
     def _rebuild_order():
-        nonlocal mapped_order, selected_idx
+        nonlocal mapped_order, selected_idx, _cached_display
         base = list(range(len(options)))
         if sort_mode == 1:
             base.sort(key=lambda i: options[i].lower())
@@ -734,6 +736,7 @@ def interactive_select(options, title="Select Option", context_type=None, metada
         if filter_text:
             base = [i for i in base if filter_text.lower() in options[i].lower()]
         mapped_order = base
+        _cached_display = [options[i] for i in mapped_order]
         if selected_idx >= len(mapped_order):
             selected_idx = max(0, len(mapped_order) - 1)
 
@@ -748,15 +751,19 @@ def interactive_select(options, title="Select Option", context_type=None, metada
     try:
         def make_panel():
             nonlocal scroll_offset, selected_idx, _filter_active, _filter_buf
-            nonlocal _right_panel_cache, _last_size, _show_details
-            nonlocal _anim_old_scroll, _anim_start, _anim_active
+            nonlocal _right_panel_cache, _last_size, _last_size_time, _show_details
+            nonlocal _anim_old_scroll, _anim_start, _anim_active, _cached_display
 
-            current_size = shutil.get_terminal_size()
-            if _last_size != (current_size.columns, current_size.lines):
-                _last_size = (current_size.columns, current_size.lines)
-                _right_panel_cache.clear()
+            now = time.monotonic()
+            if _last_size is None or (now - _last_size_time) > 0.5:
+                _last_size_time = now
+                ts = shutil.get_terminal_size()
+                if _last_size != (ts.columns, ts.lines):
+                    _last_size = (ts.columns, ts.lines)
+                    _right_panel_cache.clear()
+            width, height = _last_size
 
-            display = _get_display()
+            display = _cached_display
             if not display:
                 display = ["[dim](no matches)[/dim]"]
             if selected_idx >= len(display):
@@ -827,7 +834,6 @@ def interactive_select(options, title="Select Option", context_type=None, metada
                 padding=(1, 2)
             )
 
-            width, height = current_size.columns, current_size.lines
             mode = detect_layout_mode(width, height)
 
             body_parts = []
@@ -849,7 +855,7 @@ def interactive_select(options, title="Select Option", context_type=None, metada
                 body_parts.append(Align.center(left_panel))
 
             body = Group(*body_parts) if len(body_parts) > 1 else body_parts[0]
-            return Align(body, align="center", vertical="middle", height=current_size.lines)
+            return Align(body, align="center", vertical="middle", height=height)
 
         with RawModeContext():
             with Live(make_panel, refresh_per_second=_REFRESH_RATE, transient=False) as live:
@@ -978,6 +984,7 @@ def interactive_checklist(options, title="Select Episodes", default_start_idx=0,
 
     _right_panel_cache = {}
     _last_size = None
+    _last_size_time = 0.0
     _show_details = False
 
     if sys.stdout.isatty():
@@ -1000,19 +1007,21 @@ def interactive_checklist(options, title="Select Episodes", default_start_idx=0,
     try:
         def make_panel():
             nonlocal scroll_offset, _notify, _input_active, _input_buf
-            nonlocal _right_panel_cache, _last_size, _show_details
+            nonlocal _right_panel_cache, _last_size, _last_size_time, _show_details
             nonlocal _anim_old_scroll, _anim_start, _anim_active
             if selected_idx < scroll_offset:
                 scroll_offset = selected_idx
             elif selected_idx >= scroll_offset + max_visible:
                 scroll_offset = selected_idx - max_visible + 1
 
-            current_size = shutil.get_terminal_size()
-            if _last_size != (current_size.columns, current_size.lines):
-                _last_size = (current_size.columns, current_size.lines)
-                _right_panel_cache.clear()
-
-            width, height = current_size.columns, current_size.lines
+            now = time.monotonic()
+            if _last_size is None or (now - _last_size_time) > 0.5:
+                _last_size_time = now
+                ts = shutil.get_terminal_size()
+                if _last_size != (ts.columns, ts.lines):
+                    _last_size = (ts.columns, ts.lines)
+                    _right_panel_cache.clear()
+            width, height = _last_size
             mode = detect_layout_mode(width, height)
 
             render_scroll = scroll_offset
@@ -1090,9 +1099,9 @@ def interactive_checklist(options, title="Select Episodes", default_start_idx=0,
                 grid.add_column(ratio=_LAYOUT_SPLIT[0])
                 grid.add_column(ratio=_LAYOUT_SPLIT[1])
                 grid.add_row(left_panel, right_panel)
-                return Align(grid, align="center", vertical="middle", height=current_size.lines)
+                return Align(grid, align="center", vertical="middle", height=height)
 
-            return Align(Align.center(left_panel), align="center", vertical="middle", height=current_size.lines)
+            return Align(Align.center(left_panel), align="center", vertical="middle", height=height)
 
         _last_drag_time = 0.0
         _DRAG_WINDOW = _DRAG_THRESHOLD
