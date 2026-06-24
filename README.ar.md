@@ -6,23 +6,26 @@
 
 > هذه الترجمة العربية لأغراض المساعدة. النسخة الإنجليزية هي المرجع الرسمي.
 
-تطبيق طرفية (Terminal) للبحث عن حلقات الأنمي وتشغيلها من مصادر متعددة على الويب.
+تطبيق طرفية (Terminal) للبحث عن حلقات الأنمي وتشغيلها من مصادر متعددة على الويب. بدون إعلانات. بدون متصفح.
 
 ![License](https://img.shields.io/github/license/PanDuroDev/animeiat_cli?style=for-the-badge)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue?style=for-the-badge)
 ![Platform](https://img.shields.io/badge/platform-windows%20%7C%20macos%20%7C%20linux-lightgrey?style=for-the-badge)
+[![Latest Release](https://img.shields.io/github/v/release/PanDuroDev/animeiat_cli?style=for-the-badge)](https://github.com/PanDuroDev/animeiat_cli/releases)
 
 ## المحتويات
 
 - [للمستخدم النهائي](#للمستخدم-النهائي)
   - [ماذا يفعل التطبيق](#ماذا-يفعل-التطبيق)
   - [قبل البدء](#قبل-البدء)
-  - [التثبيت السريع](#التثبيت-السريع)
+  - [تحميل الملف التنفيذي الجاهز](#تحميل-الملف-التنفيذي-الجاهز)
+  - [التثبيت السريع (من المصدر)](#التثبيت-السريع-من-المصدر)
   - [كيفية الاستخدام](#كيفية-الاستخدام)
   - [حل المشكلات الشائعة](#حل-المشكلات-الشائعة)
 - [للمطورين](#للمطورين)
   - [المتطلبات](#المتطلبات)
   - [طريقة التثبيت](#طريقة-التثبيت)
+  - [نظام البناء](#نظام-البناء)
   - [دليل الأوامر (CLI)](#دليل-الأوامر-cli)
   - [الإعدادات (Configuration)](#الإعدادات-configuration)
   - [هيكل المشروع](#هيكل-المشروع)
@@ -51,24 +54,39 @@ animeiat-cli هو برنامج يعمل في الطرفية (Terminal) الخا�
 يجب أن يتوفر لديك:
 
 - **جهاز كمبيوتر** يعمل بنظام Windows أو macOS أو Linux.
-- **Python** إصدار 3.10 أو أحدث مثبت على نظامك.
+- **Python 3.10+** (إذا كنت تشغّل من المصدر) أو حمّل الملف التنفيذي الجاهز.
 - **مشغل فيديو** مثل VLC أو MPV. سيكتشفه التطبيق تلقائيًا.
 - **متصفح Chrome أو Edge** (اختياري) — يُستخدم فقط لاستخراج الكوكيز (cookies) للوصول إلى مصادر الأنمي. التطبيق لا يقرأ أي بيانات شخصية.
 
 إذا لم تكن متأكدًا من كيفية تثبيت Python، حمّله من [python.org](https://www.python.org/downloads/) وحدد "Add Python to PATH" أثناء التثبيت على Windows، أو استخدم مدير الحزم الخاص بنظامك على macOS/Linux.
 
-### التثبيت السريع
+### تحميل الملف التنفيذي الجاهز
+
+الملفات التنفيذية الجاهزة متوفرة في [صفحة الإصدارات](https://github.com/PanDuroDev/animeiat_cli/releases).
+
+| النظام | الملف | الحالة |
+|--------|-------|--------|
+| Windows | `animeiat-cli-windows.zip` | متوفر |
+| macOS | — | ابنِ عبر CI أو يدويًا (انظر [نظام البناء](#نظام-البناء)) |
+| Linux | — | ابنِ عبر CI أو يدويًا (انظر [نظام البناء](#نظام-البناء)) |
+
+> **ملاحظة:** البناء عبر الأنظمة (Cross-compilation) غير مدعوم. كل نظام يجب أن يُبنى عليه بشكل منفصل.
+> ادفع tag إصدار (`v*`) لتفعيل [GitHub Actions](https://github.com/PanDuroDev/animeiat_cli/actions) لبناء جميع الأنظمة تلقائيًا.
+
+لا حاجة لتثبيت Python للملفات التنفيذية الجاهزة. حمّل، فك الضغط، وشغّل.
+
+### التثبيت السريع (من المصدر)
 
 1. **ثبّت Python ومشغل الفيديو** (انظر [قبل البدء](#قبل-البدء) أعلاه).
 
-2. **حمّل المشروع.** انقر على الزر الأخضر "Code" في [صفحة GitHub](https://github.com/PanDuroDev/animeiat_cli) واختر "Download ZIP"، ثم فك الضغط. أو استخدم Git:
+2. **حمّل المشروع:**
 
    ```bash
    git clone https://github.com/PanDuroDev/animeiat_cli.git
    cd animeiat_cli
    ```
 
-3. **ثبّت حزم Python المطلوبة.** افتح الطرفية (Command Prompt على Windows، Terminal على macOS/Linux) في مجلد المشروع وشغّل:
+3. **ثبّت حزم Python المطلوبة:**
 
    ```bash
    pip install -r requirements.txt
@@ -76,13 +94,13 @@ animeiat-cli هو برنامج يعمل في الطرفية (Terminal) الخا�
 
    إذا فشل الأمر، جرب `pip3` بدل `pip`، أو شغّل `python -m pip install -r requirements.txt`.
 
-4. **ثبّت مكون المتصفح Playwright** (ضروري للوصول إلى مصادر الأنمي عبر الكوكيز):
+4. **ثبّت مكون المتصفح Playwright:**
 
    ```bash
    playwright install chromium
    ```
 
-   على Linux قد تحتاج تشغيل `playwright install --with-deps chromium` لتثبيت مكتبات النظام.
+   على Linux: `playwright install --with-deps chromium`.
 
 5. **شغّل التطبيق:**
 
@@ -92,11 +110,7 @@ animeiat-cli هو برنامج يعمل في الطرفية (Terminal) الخا�
 
    استخدم `python3` على macOS و Linux إذا لم يعمل `python`.
 
-سيحاول التطبيق تثبيت أي تبعيات مفقودة تلقائيًا عند أول تشغيل. إذا نجح `playwright install chromium`، فكل شيء جاهز.
-
 #### باستخدام Docker
-
-إذا كان Docker مثبتًا على جهازك، يمكنك تخطي الإعداد اليدوي:
 
 ```bash
 docker build -t animeiat-cli .
@@ -165,7 +179,7 @@ python anime_cli.py --version
 | `rich` | عرض واجهة المستخدم في الطرفية |
 | `httpx` | مكتبة HTTP لاستدعاء واجهات مصادر الأنمي |
 | `beautifulsoup4` + `lxml` | تحليل صفحات HTML |
-| `playwright` | استخراج كوكيز المتصفح |
+| `playwright` | أتمتة المتصفح واستخراج الكوكيز |
 | `pycryptodome` | فك تشفير الكوكيز |
 | `keyring` | الوصول البديل لمفاتيح الكوكيز على macOS/Linux (اختياري) |
 
@@ -179,11 +193,97 @@ playwright install chromium
 python anime_cli.py
 ```
 
-على Linux، إذا فشل الأمر `playwright install chromium`، شغّل:
+على Linux، إذا فشل الأمر `playwright install chromium`:
 
 ```bash
 playwright install --with-deps chromium
 ```
+
+### نظام البناء
+
+يستخدم المشروع **PyInstaller** لإنشاء ملفات تنفيذية مستقلة.  
+لا حاجة لمُجمّع C أو Cython.
+
+#### البداية السريعة
+
+```bash
+# تثبيت تبعيات البناء
+pip install pyinstaller
+
+# بناء (افتراضي: onedir + Chromium مضمّن)
+python build/build.py
+
+# بناء كملف واحد
+python build/build.py --onefile
+
+# بناء بدون Chromium (يُحمّل عند أول تشغيل)
+python build/build.py --lite
+
+# فحص بيئة البناء
+python build/build.py --check
+
+# تنظيف ملفات البناء السابقة
+python build/build.py --clean
+```
+
+#### خيارات البناء
+
+| الأمر | المخرجات | Chromium | حالة الاستخدام |
+|-------|----------|----------|----------------|
+| *(افتراضي)* | مجلد `dist/animeiat-cli/` | مضمّن (~170MB) | إقلاع سريع، Playwright مستقر |
+| `--onefile` | ملف واحد `dist/animeiat-cli.exe` | مضمّن (~900MB) | توزيع سهل |
+| `--lite` | مجلد `dist/animeiat-cli-lite/` | يُحمّل عند التشغيل (~30MB) | حجم تحميل صغير |
+| `--clean` | — | — | حذف `dist/` وذاكرة البناء |
+
+نص البناء:
+1. يكتشف نظام التشغيل (Windows / macOS / Linux)
+2. يُثبّت PyInstaller إذا كان مفقودًا
+3. يُحمّل Chromium عبر Playwright (إلا في وضع `--lite`)
+4. يشغّل PyInstaller مع ملف المواصفات (`build/animeiat-cli.spec`)
+5. يتحقق من صحة المخرجات بتشغيل `--version` على الملف المبني
+
+#### بناء عبر المنصات
+
+لا يوجد بناء عبر المنصات (Cross-compilation). ابنِ على كل منصة بشكل منفصل:
+
+```bash
+# Windows
+python build\build.py
+
+# macOS / Linux
+python build/build.py
+```
+
+كل منصة تُنتج ملفًا تنفيذيًا أصليًا بدون تبعيات Python خارجية.
+
+#### كيف يعمل
+
+```
+build/
+├── build.py              # نص البناء (أمر واحد لجميع المنصات)
+└── animeiat-cli.spec     # ملف مواصفات PyInstaller
+```
+
+- `build/animeiat-cli.spec` يُحدد محتويات الملف التنفيذي: جميع وحدات `src/`، lxml، Cryptodome، Playwright، متصفح Chromium.
+- `build/build.py` يدير العملية بأكملها: فحص التبعيات، تحميل Chromium، تشغيل PyInstaller، التحقق من المخرجات.
+
+#### CI/CD (التكامل المستمر)
+
+[sير عمل GitHub Actions](https://github.com/PanDuroDev/animeiat_cli/actions) يبني المشروع عند كل push إلى `main` وعند كل tag إصدار (`v*`):
+
+| المُشغّل | منصات البناء | المخرجات |
+|----------|-------------|----------|
+| Push إلى `main` | Windows, macOS, Linux | onedir + onefile (مرفوعة كـ CI artifacts) |
+| Tag إصدار `v*` | Windows, macOS, Linux | تُرفق تلقائيًا بصفحة الإصدارات |
+
+لتفعيل بناء لكل المنصات، ادفع tag إصدار:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+سير العمل سيَبني جميع المنصات الثلاث ويرفع الملفات التنفيذية إلى صفحة الإصدارات.
 
 ### دليل الأوامر (CLI)
 
@@ -227,33 +327,47 @@ playwright install --with-deps chromium
 
 ```
 animeiat-cli/
-├── anime_cli.py              # نقطة الدخول — تُمرّر المهام إلى src/
-├── requirements.txt          # تبعيات Python
-├── pyproject.toml            # بيانات المشروع (PEP 621)
-├── setup.py                  # إعداد بناء Cython
-├── Dockerfile                # بناء حاوية Docker
+├── anime_cli.py              # نقطة الدخول — تُثبّت التبعيات تلقائيًا، تُمرّر المهام إلى src/
+├── build/
+│   ├── build.py              # نص البناء (PyInstaller، أمر واحد)
+│   └── animeiat-cli.spec     # ملف مواصفات PyInstaller
+├── .github/
+│   └── workflows/
+│       └── build.yml         # CI/CD: بناء Windows, macOS, Linux تلقائيًا
 ├── src/
+│   ├── chromium.py           # أداة تحميل Chromium تلقائي
 │   ├── ui/
-│   │   ├── tui.py            # واجهة المستخدم التفاعلية (Rich)
+│   │   ├── __init__.py       # تصديرات واجهة المستخدم
+│   │   ├── tui.py            # الواجهة التفاعلية (Rich، ~2400 سطر)
 │   │   └── cli.py            # تحليل وسائط سطر الأوامر والتوجيه
 │   ├── providers/
+│   │   ├── __init__.py       # سجل المزوّدين
 │   │   ├── witanime.py       # مزود Witanime
 │   │   ├── anineko.py        # مزود Anineko
 │   │   └── anime3rb.py       # مزود Anime3rb
 │   ├── playback/
-│   │   ├── discovery.py      # كشف المشغلات المثبتة وتثبيتها
-│   │   ├── launch.py         # تشغيل مشغلات الفيديو (VLC, MPV, IINA ...)
-│   │   └── progress.py       # تتبع进度 التشغيل عبر IPC
+│   │   ├── __init__.py       # واجهة التشغيل
+│   │   ├── discovery.py      # كشف المشغلات (VLC, MPV, IINA...)
+│   │   ├── launch.py         # تشغيل مشغل الفيديو
+│   │   └── progress.py       # تتبع تقدّم التشغيل
 │   ├── cache/
-│   │   └── stream_cache.py   # تخزين مؤقت لروابط البث (SQLite)
+│   │   ├── __init__.py       # واجهة التخزين المؤقت
+│   │   └── stream_cache.py   # تخزين روابط البث (SQLite)
 │   ├── config/
-│   │   └── __init__.py       # إدارة ملف الإعدادات، السمات، الأيقونات
+│   │   └── __init__.py       # إعدادات، سمات، أيقونات
 │   └── db/
-│       └── __init__.py       # قاعدة البيانات (الحسابات، المفضلة، السجل)
-├── scraping.py               # مستخرج قديم (مهمل — استخدم src.providers بدلًا منه)
-├── config.py                 # إعادة تصدير قديمة (مهملة)
-├── db.py                     # إعادة تصدير قديمة (مهملة)
-└── player.py                 # إعادة تصدير قديمة (مهملة)
+│       └── __init__.py       # قاعدة البيانات: حسابات، مفضلة، سجل، تحميلات
+├── scraping.py               # مستخرج قديم (مهمل — يستخدم src/providers)
+├── config.py                 # إعادة تصدير قديمة (مهملة → src/config)
+├── db.py                     # إعادة تصدير قديمة (مهملة → src/db)
+├── player.py                 # إعادة تصدير قديمة (مهملة → src/playback)
+├── requirements.txt          # تبعيات Python
+├── pyproject.toml            # بيانات المشروع (PEP 621)
+├── setup.py                  # بناء Cython قديم (مهمل — استخدم build/build.py)
+├── Dockerfile                # بناء حاوية Docker
+├── CHANGELOG.md              # سجل التغييرات
+├── CONTRIBUTING.md           # إرشادات المساهمة
+└── LICENSE                   # رخصة MIT
 ```
 
 ### المساهمة
@@ -267,10 +381,23 @@ playwright install chromium
 pytest tests/ -v
 ```
 
-يجب أن تجتاز جميع الاختبارات الـ 74 قبل تقديم طلب سحب (Pull Request). انظر [CONTRIBUTING.md](./CONTRIBUTING.md) للإرشادات التفصيلية حول التفرع (branching)، أسلوب الكود (code style)، وسير عمل طلبات السحب.
+يجب أن تجتاز جميع الاختبارات قبل تقديم طلب سحب (Pull Request). انظر [CONTRIBUTING.md](./CONTRIBUTING.md) للإرشادات التفصيلية حول التفرع (branching)، أسلوب الكود (code style)، وسير عمل طلبات السحب.
+
+#### روابط المساهمة
+
+- [لوحة المشروع](https://github.com/PanDuroDev/animeiat_cli/projects) — تتبع التقدّم والميزات المخططة
+- [الملفات المفتوحة (Issues)](https://github.com/PanDuroDev/animeiat_cli/issues) — الإبلاغ عن أخطاء أو اقتراح ميزات
+- [المناقشات](https://github.com/PanDuroDev/animeiat_cli/discussions) — طرح الأسئلة ومشاركة الأفكار
+- [سجل التغييرات](./CHANGELOG.md) — ما تغيّر في كل إصدار
 
 ---
 
 ## الرخصة
 
 [MIT](./LICENSE)
+
+---
+
+<p align="center">
+  <strong>العربية</strong> &nbsp;|&nbsp; <a href="README.md">English</a>
+</p>

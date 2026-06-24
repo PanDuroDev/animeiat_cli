@@ -329,6 +329,9 @@ animeiat-cli/
 ├── build/
 │   ├── build.py              # Build script (PyInstaller wrapper, one command)
 │   └── animeiat-cli.spec     # PyInstaller spec file
+├── .github/
+│   └── workflows/
+│       └── build.yml         # CI/CD: auto-builds Windows, macOS, Linux
 ├── src/
 │   ├── chromium.py           # Chromium auto-install helper
 │   ├── ui/
