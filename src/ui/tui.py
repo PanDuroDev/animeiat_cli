@@ -993,15 +993,6 @@ def interactive_checklist(options, title="Select Episodes", default_start_idx=0,
         sys.stdout.write("\033[?25l")
         sys.stdout.flush()
 
-    def _scroll_to(idx):
-        nonlocal scroll_offset
-        selected_idx = max(0, min(idx, len(options) - 1))
-        if selected_idx < scroll_offset:
-            scroll_offset = selected_idx
-        elif selected_idx >= scroll_offset + max_visible:
-            scroll_offset = selected_idx - max_visible + 1
-        return selected_idx
-
     _anim_old_scroll = 0
     _anim_start = 0.0
     _anim_active = False
