@@ -845,6 +845,8 @@ def interactive_select(options, title="Select Option", context_type=None, metada
                 orig_idx = mapped_order[selected_idx] if selected_idx < len(mapped_order) else 0
                 if orig_idx not in _right_panel_cache:
                     _right_panel_cache[orig_idx] = get_context_panel(context_type, orig_idx, options, metadata)
+                    if len(_right_panel_cache) > 60:
+                        _right_panel_cache.clear()
                 right_panel = _right_panel_cache[orig_idx]
                 grid = Table.grid(expand=True)
                 grid.add_column(ratio=_LAYOUT_SPLIT[0])
@@ -1094,6 +1096,8 @@ def interactive_checklist(options, title="Select Episodes", default_start_idx=0,
             if show_right:
                 if selected_idx not in _right_panel_cache:
                     _right_panel_cache[selected_idx] = get_context_panel(context_type, selected_idx, options, metadata)
+                    if len(_right_panel_cache) > 60:
+                        _right_panel_cache.clear()
                 right_panel = _right_panel_cache[selected_idx]
                 grid = Table.grid(expand=True)
                 grid.add_column(ratio=_LAYOUT_SPLIT[0])
