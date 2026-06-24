@@ -335,7 +335,7 @@ def _centered_message(msg, level="info"):
         Group(Text.from_markup(f"{icon} {msg}", style=color, justify="center"), Text("")),
         box=rich_box.ROUNDED,
         border_style=THEME['border'],
-        padding=(1, 3),
+        padding=(1, 2),
         width=min(80, w - 4),
     )
     console.clear()
@@ -356,7 +356,7 @@ def _centered_prompt(prompt_text):
             Text.from_markup(f"{get_icon('settings')} {prompt_text}", style=THEME['fg'], justify="center"),
             box=rich_box.ROUNDED,
             border_style=THEME['border'],
-            padding=(1, 3),
+            padding=(1, 2),
             width=min(80, w - 4),
         )
         console.clear()
@@ -387,7 +387,7 @@ def _centered_status(text, spinner="dots", icon="search"):
                 Group(Text.from_markup(f"{prefix} {text}", style=THEME['primary'], justify="center"), Text(""), spinner_renderable),
                 box=rich_box.ROUNDED,
                 border_style=THEME['border'],
-                padding=(1, 3),
+                padding=(1, 2),
             ),
             align="center",
             vertical="middle",
@@ -681,7 +681,7 @@ def get_context_panel(context_type, selected_idx, options, metadata=None):
         title=f"[bold {THEME['primary']}] {title_text} [/bold {THEME['primary']}]",
         border_style=THEME['border'],
         box=rich_box.ROUNDED,
-        padding=(1, 1),
+        padding=(1, 2),
         expand=True
     )
 
@@ -1036,7 +1036,7 @@ def interactive_checklist(options, title="Select Episodes", default_start_idx=0,
                     eased = 1.0 - (1.0 - progress) ** 3
                     render_scroll = int(round(_anim_old_scroll + (scroll_offset - _anim_old_scroll) * eased))
 
-            table = Table(box=None, show_header=False, pad_edge=False)
+            table = Table(box=None, show_header=False, pad_edge=False, padding=(0, 1))
 
             if render_scroll > 0:
                 table.add_row(f"[dim {THEME['dim']}]  {get_icon('arrow_up')}more items above[/dim {THEME['dim']}]")
@@ -1074,9 +1074,9 @@ def interactive_checklist(options, title="Select Episodes", default_start_idx=0,
             current_page = selected_idx // _PAGE_SIZE + 1
             page_info = f"(p.{current_page}/{total_pages} ep.{selected_idx + 1}/{len(options)}) [{sel_count} selected]"
 
-            fav_icon = f" [bold {THEME['error']}]{get_icon('favorite_on')}[/bold {THEME['error']}]" if is_favorite else f" [{THEME['dim']}]{get_icon('favorite_off')}[/{THEME['dim']}]"
+            fav_icon = f" [bold {THEME['warning']}]{get_icon('favorite_on')}[/bold {THEME['warning']}]" if is_favorite else f" [{THEME['dim']}]{get_icon('favorite_off')}[/{THEME['dim']}]"
 
-            drag_label = "[bold yellow]\u25b6 drag[/bold yellow]" if _in_drag() else "SPACE+\u2195=drag"
+            drag_label = f"[bold {THEME['warning']}]\u25b6 drag[/bold {THEME['warning']}]" if _in_drag() else "SPACE+\u2195=drag"
             player_info = ""
             if player_name and active_player:
                 player_info = f" | {icons.get('check', '')} {player_name} ({active_player})" if icons else f" | {player_name}"
