@@ -60,15 +60,18 @@ If you are not sure how to install Python, download it from [python.org](https:/
 
 ### Download Prebuilt Binary
 
-Prebuilt executables are available on the [Releases page](https://github.com/PanDuroDev/animeiat_cli/releases). Download the one for your platform:
+Prebuilt executables are available on the [Releases page](https://github.com/PanDuroDev/animeiat_cli/releases).
 
-| Platform | File | Notes |
-|----------|------|-------|
-| Windows | `animeiat-cli-windows.zip` | Extract and run `animeiat-cli.exe` |
-| macOS | `animeiat-cli-macos.tar.gz` | Intel & ARM |
-| Linux | `animeiat-cli-linux.tar.gz` | x86_64 |
+| Platform | File | Status |
+|----------|------|--------|
+| Windows | `animeiat-cli-windows.zip` | Available |
+| macOS | — | Build via CI or manually (see [Build System](#build-system)) |
+| Linux | — | Build via CI or manually (see [Build System](#build-system)) |
 
-No Python installation required. Just download, extract, and run.
+> **Note:** Cross-compilation is not supported. Each platform must be built natively.
+> Push a version tag (`v*`) to trigger [GitHub Actions](https://github.com/PanDuroDev/animeiat_cli/actions) to build all platforms automatically.
+
+No Python installation required for prebuilt binaries. Just download, extract, and run.
 
 ### Quick Install (from source)
 
@@ -264,8 +267,21 @@ build/
 
 #### CI/CD
 
-Prebuilt binaries for all platforms are available on the [Releases page](https://github.com/PanDuroDev/animeiat_cli/releases).  
-Each release is built via GitHub Actions using `python build/build.py --onefile`.
+A [GitHub Actions workflow](https://github.com/PanDuroDev/animeiat_cli/actions) builds the project on every push to `main` and every version tag (`v*`):
+
+| Trigger | Build matrix | Artifacts |
+|---------|-------------|-----------|
+| Push to `main` | Windows, macOS, Linux | onedir + onefile (uploaded as CI artifacts) |
+| Tag push `v*` | Windows, macOS, Linux | Attached to Release automatically |
+
+To trigger a full cross-platform build, push a version tag:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The workflow will build all three platforms and upload the executables to the Release page.
 
 ### CLI Reference
 
