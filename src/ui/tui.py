@@ -709,7 +709,6 @@ def interactive_select(options, title="Select Option", context_type=None, metada
     mapped_order = list(range(len(options)))
     filter_text = ""
     sort_mode = 0
-    _get_display = lambda: [options[i] for i in mapped_order]
     selected_idx = 0
     scroll_offset = 0
     _, term_height = shutil.get_terminal_size()
@@ -724,7 +723,7 @@ def interactive_select(options, title="Select Option", context_type=None, metada
     _last_size_time = 0.0
     _filter_active = False
     _filter_buf = ""
-    _cached_display = []
+    _cached_display = [options[i] for i in mapped_order]
 
     def _rebuild_order():
         nonlocal mapped_order, selected_idx, _cached_display
@@ -859,8 +858,30 @@ def interactive_select(options, title="Select Option", context_type=None, metada
             body = Group(*body_parts) if len(body_parts) > 1 else body_parts[0]
             return Align(body, align="center", vertical="middle", height=height)
 
+        def _run_anim():
+            nonlocal _anim_active
+            if not _anim_active:
+                return None
+            while _anim_active:
+                live.update(make_panel())
+                if os.name == 'nt' and msvcrt.kbhit():
+                    return read_key()
+                elif os.name != 'nt':
+                    import select
+                    r, _, _ = select.select([sys.stdin], [], [], 0.05)
+                    if r:
+                        return read_key()
+                elapsed = time.monotonic() - _anim_start
+                if elapsed >= _ANIM_DURATION:
+                    _anim_active = False
+                    break
+                time.sleep(0.05)
+            live.update(make_panel())
+            return None
+
         with RawModeContext():
-            with Live(make_panel, refresh_per_second=_REFRESH_RATE, transient=False) as live:
+            with Live(None, refresh_per_second=_REFRESH_RATE, transient=False) as live:
+                live.update(make_panel())
                 while True:
                     key = read_key()
 
@@ -879,38 +900,38 @@ def interactive_select(options, title="Select Option", context_type=None, metada
                             _filter_buf = _filter_buf[:-1]
                         elif isinstance(key, str) and key.isprintable():
                             _filter_buf += key
-                        live.refresh()
+                        live.update(make_panel())
                         continue
 
-                    display = _get_display()
+                    display = _cached_display
                     if key == KEY_UP:
                         if display:
                             _anim_old_scroll = scroll_offset
                             _anim_start = time.monotonic()
                             _anim_active = True
                             selected_idx = (selected_idx - 1) % len(display)
-                        live.refresh()
+                        key = _run_anim() or key
                     elif key == KEY_DOWN:
                         if display:
                             _anim_old_scroll = scroll_offset
                             _anim_start = time.monotonic()
                             _anim_active = True
                             selected_idx = (selected_idx + 1) % len(display)
-                        live.refresh()
+                        key = _run_anim() or key
                     elif key in ('d', 'D'):
                         if context_type:
                             _show_details = not _show_details
-                            live.refresh()
+                            live.update(make_panel())
                     elif key == '/':
                         _filter_active = True
                         _filter_buf = ""
-                        live.refresh()
+                        live.update(make_panel())
                     elif key in ('s', 'S'):
                         sort_mode = (sort_mode + 1) % 3
                         _rebuild_order()
                         _update_right_cache()
                         selected_idx = 0
-                        live.refresh()
+                        live.update(make_panel())
                     elif key in ('?', 'h', 'H'):
                         _show_help_panel([
                             ("\u2191 / \u2193", "Navigate list"),
@@ -921,14 +942,14 @@ def interactive_select(options, title="Select Option", context_type=None, metada
                             ("s", "Cycle sort order"),
                             ("g / G", "Go to first / last"),
                         ], "Navigation Help")
-                        live.refresh()
+                        live.update(make_panel())
                     elif key in ('q', 'Q'):
                         if filter_text:
                             filter_text = ""
                             _rebuild_order()
                             _update_right_cache()
                             selected_idx = 0
-                            live.refresh()
+                            live.update(make_panel())
                         else:
                             return -1, None
                     elif key == KEY_ENTER:
@@ -941,7 +962,7 @@ def interactive_select(options, title="Select Option", context_type=None, metada
                             _rebuild_order()
                             _update_right_cache()
                             selected_idx = 0
-                            live.refresh()
+                            live.update(make_panel())
                         else:
                             return -1, None
                     elif key in ('g', 'G'):
@@ -950,7 +971,7 @@ def interactive_select(options, title="Select Option", context_type=None, metada
                             _anim_start = time.monotonic()
                             _anim_active = True
                             selected_idx = 0 if key == 'g' else len(display) - 1
-                        live.refresh()
+                        key = _run_anim() or key
                     elif key == KEY_UNKNOWN:
                         pass
                     else:
@@ -1104,8 +1125,30 @@ def interactive_checklist(options, title="Select Episodes", default_start_idx=0,
         def _in_drag():
             return time.time() - _last_drag_time < _DRAG_WINDOW
 
+        def _run_anim():
+            nonlocal _anim_active
+            if not _anim_active:
+                return None
+            while _anim_active:
+                live.update(make_panel())
+                if os.name == 'nt' and msvcrt.kbhit():
+                    return read_key()
+                elif os.name != 'nt':
+                    import select
+                    r, _, _ = select.select([sys.stdin], [], [], 0.05)
+                    if r:
+                        return read_key()
+                elapsed = time.monotonic() - _anim_start
+                if elapsed >= _ANIM_DURATION:
+                    _anim_active = False
+                    break
+                time.sleep(0.05)
+            live.update(make_panel())
+            return None
+
         with RawModeContext():
-            with Live(make_panel, refresh_per_second=_REFRESH_RATE, transient=False) as live:
+            with Live(None, refresh_per_second=_REFRESH_RATE, transient=False) as live:
+                live.update(make_panel())
                 while True:
                     key = read_key()
 
@@ -1131,7 +1174,7 @@ def interactive_checklist(options, title="Select Episodes", default_start_idx=0,
                             _input_buf = _input_buf[:-1]
                         elif isinstance(key, str) and key.isdigit():
                             _input_buf += key
-                        live.refresh()
+                        live.update(make_panel())
                         continue
 
                     now = time.time()
@@ -1145,7 +1188,7 @@ def interactive_checklist(options, title="Select Episodes", default_start_idx=0,
                         if is_dragging:
                             checked[selected_idx] = not checked[selected_idx]
                             _last_drag_time = now
-                        live.refresh()
+                        key = _run_anim() or key
                     elif key == KEY_DOWN:
                         _anim_old_scroll = scroll_offset
                         _anim_start = time.monotonic()
@@ -1154,45 +1197,45 @@ def interactive_checklist(options, title="Select Episodes", default_start_idx=0,
                         if is_dragging:
                             checked[selected_idx] = not checked[selected_idx]
                             _last_drag_time = now
-                        live.refresh()
+                        key = _run_anim() or key
                     elif key in ('d', 'D'):
                         if context_type:
                             _show_details = not _show_details
-                            live.refresh()
+                            live.update(make_panel())
                     elif key == KEY_SPACE:
                         checked[selected_idx] = not checked[selected_idx]
                         _last_drag_time = now
-                        live.refresh()
+                        live.update(make_panel())
                     elif key == KEY_A:
                         all_checked = all(checked)
                         checked = [not all_checked] * len(options)
-                        live.refresh()
+                        live.update(make_panel())
                     elif key in ('f', 'F'):
                         if on_toggle_favorite:
                             is_favorite = on_toggle_favorite()
-                            live.refresh()
+                            live.update(make_panel())
                     elif key == '[':
                         _anim_old_scroll = scroll_offset
                         _anim_start = time.monotonic()
                         _anim_active = True
                         selected_idx = max(0, selected_idx - _PAGE_SIZE)
-                        live.refresh()
+                        key = _run_anim() or key
                     elif key == ']':
                         _anim_old_scroll = scroll_offset
                         _anim_start = time.monotonic()
                         _anim_active = True
                         selected_idx = min(len(options) - 1, selected_idx + _PAGE_SIZE)
-                        live.refresh()
+                        key = _run_anim() or key
                     elif key in ('g', 'G'):
                         _anim_old_scroll = scroll_offset
                         _anim_start = time.monotonic()
                         _anim_active = True
                         selected_idx = 0 if key == 'g' else len(options) - 1
-                        live.refresh()
+                        key = _run_anim() or key
                     elif key in ('j', 'J'):
                         _input_active = True
                         _input_buf = ""
-                        live.refresh()
+                        live.update(make_panel())
                     elif key in ('?', 'h', 'H'):
                         _show_help_panel([
                             ("\u2191 / \u2193", "Navigate list"),
@@ -1206,7 +1249,7 @@ def interactive_checklist(options, title="Select Episodes", default_start_idx=0,
                             ("Enter", "Scrape & play selected"),
                             ("Esc", "Go back"),
                         ], "Episode Selection Help")
-                        live.refresh()
+                        live.update(make_panel())
                     elif key == KEY_ENTER:
                         return [idx for idx, val in enumerate(checked) if val]
                     elif key in (KEY_ESC, KEY_CTRL_C):
