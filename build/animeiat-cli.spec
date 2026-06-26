@@ -73,7 +73,7 @@ if not _lite:
 
 
 a = Analysis(
-    [os.path.join(os.getcwd(), "anime_cli.py")],
+    [os.path.join(os.getcwd(), "src", "ui", "cli.py")],
     pathex=[os.getcwd()],
     binaries=binaries,
     datas=datas,

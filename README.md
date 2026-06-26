@@ -73,7 +73,9 @@ Prebuilt executables are available on the [Releases page](https://github.com/Pan
 
 No Python installation required for prebuilt binaries. Just download, extract, and run.
 
-### Quick Install (from source)
+#> **Note:** This `main` branch is for production use. Development (including tests and experimental scripts) is on the `develop` branch.
+
+## Quick Install (from source)
 
 1. **Install Python and a media player** (see [Before You Start](#before-you-start) above).
 
