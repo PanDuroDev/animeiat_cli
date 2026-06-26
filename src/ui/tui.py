@@ -15,8 +15,6 @@ import json
 import os
 import re
 import shutil
-import sqlite3
-import subprocess
 import sys
 import time
 from urllib.parse import urlparse, quote_plus
@@ -32,38 +30,38 @@ from rich.text import Text
 from rich.markup import escape
 from rich import box as rich_box
 
-from config import (
+from src.config import (
     APP_VERSION, THEME, console, get_icon, get_provider_name,
     get_config_dir, get_config_path, load_config, save_config,
     add_search_history, get_http_client, write_custom_config_dir,
     _config_cache,
 )
-from db import (
-    get_db_path, init_db, migrate_json_to_sqlite,
+from src.db import (
+    get_db_path, get_db_connection,
+    init_db, migrate_json_to_sqlite,
     toggle_favorite_state, is_favorite_slug,
     add_watch_history, get_watch_history,
     save_account_token, get_account_token, remove_account,
     fetch_anime_metadata,
     fetch_anilist_user_list, fetch_mal_user_list,
-    cache_stream_url, get_cached_stream_url,
     get_all_episode_progress,
     add_download_entry, get_downloads, remove_download_entry, update_download_status,
 )
-from player import (
+from src.cache import cache_stream_url, get_cached_stream_url
+from src.playback.discovery import (
     get_cached_players, clear_player_cache,
     find_vlc, find_mpv, find_iina, find_celluloid, find_haruna,
     install_player,
+)
+from src.playback.launch import (
     play_with_vlc, play_with_mpv, play_with_iina,
     play_with_celluloid, play_with_haruna,
-    _invalidate_player_cfg as invalidate_player_cfg,
 )
-from scraping import (
-    validate_url, extract_slug, get_preferred_cookies,
-    deduplicate_search_results, deduplicate_search_results_multi,
-    search_providers_for_media,
-    fetch_episodes_list_async, scrape_multiple_streams_async,
-)
-from src.providers import registry as provider_registry
+from src.playback.discovery import _invalidate_player_cfg as invalidate_player_cfg
+from src.providers._utils import validate_url, extract_slug
+from src.providers._cookies import get_preferred_cookies
+from src.providers._scraper import fetch_episodes_list_async, scrape_multiple_streams_async
+from src.providers import registry as provider_registry, search_providers_for_media
 
 # ── Constants ────────────────────────────────────────────────
 _ANIM_DURATION = 0.3
@@ -418,8 +416,8 @@ def check_for_update(current_version):
             latest = resp.text.strip()
             _update_cache["latest"] = latest
             return latest, latest != current_version
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[animeiat-cli] Warning: update check failed: {e}")
     return None
 
 
@@ -469,8 +467,7 @@ def _show_track_selector(track_info=None):
         if key in (KEY_ESC, KEY_CTRL_C):
             return None
         if key == 'a':
-            console.print(f"\n[{THEME['accent']}]Enter audio track ID (or leave empty for auto):[/{THEME['accent']}] ", end="")
-            raw = _simple_read_line()
+            raw = _centered_prompt("Enter audio track ID (or leave empty for auto)")
             if raw:
                 try:
                     track_info["audio_id"] = int(raw)
@@ -481,8 +478,7 @@ def _show_track_selector(track_info=None):
             track_info["audio_id"] = None
             track_info["audio_lang"] = None
         elif key == 's':
-            console.print(f"\n[{THEME['accent']}]Enter subtitle track ID (or leave empty for off):[/{THEME['accent']}] ", end="")
-            raw = _simple_read_line()
+            raw = _centered_prompt("Enter subtitle track ID (or leave empty for off)")
             if raw:
                 try:
                     track_info["sub_id"] = int(raw)
@@ -492,21 +488,6 @@ def _show_track_selector(track_info=None):
         elif key == 'S':
             track_info["sub_id"] = None
             track_info["sub_lang"] = None
-
-
-def _simple_read_line():
-    buf = []
-    while True:
-        k = read_key()
-        if k == KEY_ENTER:
-            return "".join(buf)
-        if k in (KEY_ESC, KEY_CTRL_C):
-            return None
-        if k in ('\x08', '\x7f'):
-            if buf:
-                buf.pop()
-        elif isinstance(k, str) and k.isprintable():
-            buf.append(k)
 
 
 def get_context_panel(context_type, selected_idx, options, metadata=None):
@@ -1276,7 +1257,7 @@ def _handle_main_menu(current, stack, ctx):
     ]
     fav_count = 0
     try:
-        conn = sqlite3.connect(get_db_path())
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM favorites")
         fav_count = cursor.fetchone()[0]
@@ -1600,10 +1581,9 @@ def _handle_url_input(current, stack, ctx):
 
 
 def _handle_favorites(current, stack, ctx):
-    db_path = get_db_path()
     favs = []
     try:
-        conn = sqlite3.connect(db_path)
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT slug, title, url, is_witanime FROM favorites")
         for row in cursor.fetchall():
@@ -1682,7 +1662,6 @@ def _handle_settings(current, stack, ctx):
 
 
 def _settings_player(cfg):
-    from config import _config_cache
     history_enabled = cfg.get("history_tracking", True)
     fullscreen_enabled = cfg.get("fullscreen", False)
     player_args = cfg.get("custom_player_args", "")
@@ -1863,7 +1842,7 @@ def _settings_data_sync(cfg, stack):
             if confirm is None or confirm.strip().lower() != "yes":
                 continue
             try:
-                conn = sqlite3.connect(get_db_path())
+                conn = get_db_connection()
                 cursor = conn.cursor()
                 cursor.execute("DELETE FROM favorites")
                 cursor.execute("DELETE FROM shows")
@@ -1943,7 +1922,6 @@ def _settings_about(ctx):
     celluloid_ok = players.get("celluloid") is not None
     haruna_ok = players.get("haruna") is not None
 
-    _ = os.name
     anilist_token = get_account_token("anilist")
     mal_token = get_account_token("myanimelist")
 
@@ -1990,7 +1968,8 @@ def _settings_about(ctx):
     if key in ("u", "U"):
         update = check_for_update(APP_VERSION)
         if update:
-            _centered_message(f"Current version: {APP_VERSION}\nLatest version: {update.get('v', {}).get('version', '?')}\nPress 'u' in main menu to update.", level="info")
+            latest, _ = update
+            _centered_message(f"Current version: {APP_VERSION}\nLatest version: {latest}\nPress 'u' in main menu to update.", level="info")
         else:
             _centered_message(f"Current version: {APP_VERSION}\nYou are up to date!", level="info")
 
@@ -2004,8 +1983,6 @@ def _handle_episode_selection(current, stack, ctx):
     active_player = ctx["active_player"]
     player_name = ctx["player_name"]
     pref_player = ctx["pref_player"]
-    vlc = ctx["vlc"]; mpv = ctx["mpv"]; iina = ctx["iina"]
-    celluloid = ctx["celluloid"]; haruna = ctx["haruna"]
 
     history_data = get_watch_history(slug, provider=is_witanime)
     last_watched = history_data.get("last_watched", 0)
@@ -2181,13 +2158,13 @@ def _handle_episode_selection(current, stack, ctx):
         if player_name == "MPV":
             launch_success = play_with_mpv(stream_urls, slug=slug, ep=eps_to_scrape[0]["episode"], extra_args=track_args)
         elif player_name == "VLC":
-            launch_success = play_with_vlc(stream_urls)
+            launch_success = play_with_vlc(stream_urls, extra_args=track_args)
         elif player_name == "IINA":
-            launch_success = play_with_iina(stream_urls)
+            launch_success = play_with_iina(stream_urls, extra_args=track_args)
         elif player_name == "Celluloid":
-            launch_success = play_with_celluloid(stream_urls)
+            launch_success = play_with_celluloid(stream_urls, extra_args=track_args)
         elif player_name == "Haruna":
-            launch_success = play_with_haruna(stream_urls)
+            launch_success = play_with_haruna(stream_urls, extra_args=track_args)
         if launch_success:
             for ep_num in ep_numbers:
                 add_watch_history(slug, ep_num, anime_title, provider=is_witanime)
@@ -2208,9 +2185,8 @@ def _handle_export():
     if f_idx == -1:
         return
 
-    db_path = get_db_path()
     try:
-        conn = sqlite3.connect(db_path)
+        conn = get_db_connection()
         cursor = conn.cursor()
 
         cursor.execute("SELECT slug, last_watched FROM shows ORDER BY slug")
@@ -2296,7 +2272,7 @@ def _handle_download_manager(current, stack, ctx):
 
 def _handle_continue_watching(current, stack, ctx):
     try:
-        conn = sqlite3.connect(get_db_path())
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("""
             SELECT DISTINCT s.slug, s.last_watched
@@ -2325,7 +2301,7 @@ def _handle_continue_watching(current, stack, ctx):
         title = bare_slug
         anime_url = ""
         try:
-            conn = sqlite3.connect(get_db_path())
+            conn = get_db_connection()
             c = conn.cursor()
             c.execute("SELECT title, url FROM favorites WHERE slug = ?", (bare_slug,))
             fav_row = c.fetchone()
@@ -2333,8 +2309,8 @@ def _handle_continue_watching(current, stack, ctx):
                 title = fav_row[0] if fav_row[0] else bare_slug
                 anime_url = fav_row[1] if fav_row[1] else ""
             conn.close()
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[animeiat-cli] Warning: continue watching fav lookup failed: {e}")
         items.append({"slug": bare_slug, "title": title, "url": anime_url, "is_witanime": provider, "last_watched": last_watched})
     if not items:
         _centered_message("No watch history found. Watch some episodes first!", level="info")
@@ -2421,7 +2397,6 @@ def run_app(initial_url=None, player_override=None, quality_override=None):
             "FAVORITES": "Favorites Library",
             "SETTINGS": "Configuration Settings",
             "EPISODE_SELECTION": f"Episodes: {current.get('slug', '')}",
-            "PLAYBACK": f"Playing: {current.get('slug', '')}",
         }
         set_terminal_title(title_map.get(state, "Anime CLI Player"))
 

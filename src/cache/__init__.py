@@ -15,7 +15,7 @@ class StreamCache(Protocol):
     def get_cached_stream_url(self, slug: str, episode: int, provider: int = 0, max_age_hours: int = 24) -> Optional[dict]:
         ...
 
-    def clear_stream_cache(self, slug: Optional[str] = None, max_age_hours: int = 24) -> None:
+    def clear_stream_cache(self, slug: Optional[str] = None, max_age_hours: int = 24, provider: int = 0) -> None:
         ...
 
 

@@ -2,11 +2,10 @@ import os
 import subprocess
 import threading
 
-from config import load_config
-from db import get_episode_progress
-
 from .discovery import get_cached_players, _get_player_cfg
 from .progress import poll_mpv_progress
+from ..config import load_config
+from ..db import get_episode_progress
 
 
 def play(stream_urls, player="mpv", fullscreen=True, slug=None, episode=None, extra_args=None):
@@ -41,7 +40,8 @@ def play_with_vlc(stream_urls, extra_args=None):
         else:
             subprocess.Popen(cmd, start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return True
-    except Exception:
+    except Exception as e:
+        print(f"[animeiat-cli] Warning: VLC launch failed: {e}")
         return False
 
 
@@ -86,50 +86,60 @@ def play_with_mpv(stream_urls, slug=None, ep=None, extra_args=None):
             threading.Thread(target=poll_mpv_progress, args=(ipc_path, slug, ep), daemon=True).start()
 
         return True
-    except Exception:
+    except Exception as e:
+        print(f"[animeiat-cli] Warning: MPV launch failed: {e}")
         return False
 
 
-def play_with_iina(stream_urls):
+def play_with_iina(stream_urls, extra_args=None):
     iina_path = get_cached_players().get("iina")
     if not iina_path:
         return False
     pcfg = _get_player_cfg()
     user_args = list(pcfg["custom_args"])
+    if extra_args:
+        user_args = extra_args + user_args
     fs_arg = ["--mpv-fs"] if pcfg["fullscreen"] else []
     cmd = [iina_path] + fs_arg + user_args + stream_urls
     try:
         subprocess.Popen(cmd, start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return True
-    except Exception:
+    except Exception as e:
+        print(f"[animeiat-cli] Warning: IINA launch failed: {e}")
         return False
 
 
-def play_with_celluloid(stream_urls):
+def play_with_celluloid(stream_urls, extra_args=None):
     celluloid_path = get_cached_players().get("celluloid")
     if not celluloid_path:
         return False
     pcfg = _get_player_cfg()
     user_args = list(pcfg["custom_args"])
+    if extra_args:
+        user_args = extra_args + user_args
     fs_arg = ["--fullscreen"] if pcfg["fullscreen"] else []
     cmd = [celluloid_path] + fs_arg + user_args + stream_urls
     try:
         subprocess.Popen(cmd, start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return True
-    except Exception:
+    except Exception as e:
+        print(f"[animeiat-cli] Warning: Celluloid launch failed: {e}")
         return False
 
 
-def play_with_haruna(stream_urls):
+def play_with_haruna(stream_urls, extra_args=None):
     haruna_path = get_cached_players().get("haruna")
     if not haruna_path:
         return False
     pcfg = _get_player_cfg()
     user_args = list(pcfg["custom_args"])
+    if extra_args:
+        user_args = extra_args + user_args
     fs_arg = ["--fullscreen"] if pcfg["fullscreen"] else []
     cmd = [haruna_path] + fs_arg + user_args + stream_urls
     try:
         subprocess.Popen(cmd, start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return True
-    except Exception:
+    except Exception as e:
+        print(f"[animeiat-cli] Warning: Haruna launch failed: {e}")
         return False

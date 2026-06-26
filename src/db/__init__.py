@@ -11,19 +11,29 @@ import time
 
 import httpx
 
-from config import get_config_dir, get_config_path, load_config, get_http_client
+from src.config import get_config_dir, get_config_path, load_config, get_http_client
+
+_db_write_lock = threading.Lock()
 
 
 def get_db_path():
     return os.path.join(get_config_dir(), "animeiat_cli.db")
 
 
+def get_db_connection():
+    conn = sqlite3.connect(get_db_path(), timeout=5.0, check_same_thread=False)
+    conn.execute("PRAGMA busy_timeout=5000")
+    return conn
+
+
 def init_db():
     _migrate_old_db()
     db_path = get_db_path()
     try:
-        conn = sqlite3.connect(db_path)
+        conn = sqlite3.connect(db_path, timeout=5.0)
         cursor = conn.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA busy_timeout=5000")
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS favorites (
                 slug TEXT PRIMARY KEY,
@@ -116,11 +126,12 @@ def _migrate_old_db():
                     return
                 else:
                     os.remove(new_db)
-            except Exception:
+            except Exception as e:
+                print(f"[animeiat-cli] Warning: DB migration copy failed: {e}")
                 try:
                     os.remove(new_db)
-                except Exception:
-                    pass
+                except Exception as e2:
+                    print(f"[animeiat-cli] Warning: failed to remove corrupt new DB: {e2}")
 
 
 def migrate_json_to_sqlite():
@@ -132,8 +143,7 @@ def migrate_json_to_sqlite():
             cfg = json.load(f)
 
         migrated = False
-        db_path = get_db_path()
-        conn = sqlite3.connect(db_path)
+        conn = get_db_connection()
         cursor = conn.cursor()
 
         if "favorites" in cfg and cfg["favorites"]:
@@ -176,9 +186,8 @@ def migrate_json_to_sqlite():
 
 
 def save_episode_progress(slug, ep, time_pos, duration):
-    db_path = get_db_path()
     try:
-        conn = sqlite3.connect(db_path)
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute(
             "INSERT OR REPLACE INTO episode_progress (slug, episode, time_pos, duration) VALUES (?, ?, ?, ?)",
@@ -186,14 +195,13 @@ def save_episode_progress(slug, ep, time_pos, duration):
         )
         conn.commit()
         conn.close()
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[animeiat-cli] Warning: save_episode_progress failed: {e}")
 
 
 def get_episode_progress(slug, ep):
-    db_path = get_db_path()
     try:
-        conn = sqlite3.connect(db_path)
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute(
             "SELECT time_pos, duration FROM episode_progress WHERE slug = ? AND episode = ?",
@@ -203,15 +211,14 @@ def get_episode_progress(slug, ep):
         conn.close()
         if row:
             return {"time_pos": row[0], "duration": row[1]}
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[animeiat-cli] Warning: get_episode_progress failed: {e}")
     return None
 
 
 def toggle_favorite_state(title, url, is_witanime, slug):
-    db_path = get_db_path()
     try:
-        conn = sqlite3.connect(db_path)
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT 1 FROM favorites WHERE slug = ?", (slug,))
         exists = cursor.fetchone() is not None
@@ -227,27 +234,27 @@ def toggle_favorite_state(title, url, is_witanime, slug):
         conn.commit()
         conn.close()
         return ret
-    except Exception:
+    except Exception as e:
+        print(f"[animeiat-cli] Warning: toggle_favorite_state failed: {e}")
         return False
 
 
 def is_favorite_slug(slug):
-    db_path = get_db_path()
     try:
-        conn = sqlite3.connect(db_path)
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT 1 FROM favorites WHERE slug = ?", (slug,))
         exists = cursor.fetchone() is not None
         conn.close()
         return exists
-    except Exception:
+    except Exception as e:
+        print(f"[animeiat-cli] Warning: is_favorite_slug failed: {e}")
         return False
 
 
 def get_all_episode_progress(slug):
-    db_path = get_db_path()
     try:
-        conn = sqlite3.connect(db_path)
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute(
             "SELECT episode, time_pos, duration FROM episode_progress WHERE slug = ?",
@@ -256,14 +263,14 @@ def get_all_episode_progress(slug):
         rows = cursor.fetchall()
         conn.close()
         return {r[0]: {"time_pos": r[1], "duration": r[2]} for r in rows}
-    except Exception:
+    except Exception as e:
+        print(f"[animeiat-cli] Warning: get_all_episode_progress failed: {e}")
         return {}
 
 
 def add_download_entry(slug, episode, stream_url, quality=""):
-    db_path = get_db_path()
     try:
-        conn = sqlite3.connect(db_path)
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute(
             "INSERT OR REPLACE INTO downloads (slug, episode, stream_url, quality, status, added_at) VALUES (?, ?, ?, ?, 'pending', ?)",
@@ -272,14 +279,14 @@ def add_download_entry(slug, episode, stream_url, quality=""):
         conn.commit()
         conn.close()
         return True
-    except Exception:
+    except Exception as e:
+        print(f"[animeiat-cli] Warning: add_download_entry failed: {e}")
         return False
 
 
 def get_downloads(slug=None):
-    db_path = get_db_path()
     try:
-        conn = sqlite3.connect(db_path)
+        conn = get_db_connection()
         cursor = conn.cursor()
         if slug:
             cursor.execute(
@@ -300,27 +307,27 @@ def get_downloads(slug=None):
             }
             for r in rows
         ]
-    except Exception:
+    except Exception as e:
+        print(f"[animeiat-cli] Warning: get_downloads failed: {e}")
         return []
 
 
 def remove_download_entry(slug, episode):
-    db_path = get_db_path()
     try:
-        conn = sqlite3.connect(db_path)
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("DELETE FROM downloads WHERE slug = ? AND episode = ?", (slug, episode))
         conn.commit()
         conn.close()
         return True
-    except Exception:
+    except Exception as e:
+        print(f"[animeiat-cli] Warning: remove_download_entry failed: {e}")
         return False
 
 
 def update_download_status(slug, episode, status, file_path=""):
-    db_path = get_db_path()
     try:
-        conn = sqlite3.connect(db_path)
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute(
             "UPDATE downloads SET status = ?, file_path = ?, downloaded_at = ? WHERE slug = ? AND episode = ?",
@@ -329,7 +336,8 @@ def update_download_status(slug, episode, status, file_path=""):
         conn.commit()
         conn.close()
         return True
-    except Exception:
+    except Exception as e:
+        print(f"[animeiat-cli] Warning: update_download_status failed: {e}")
         return False
 
 
@@ -338,25 +346,23 @@ def add_watch_history(slug, episode_num, anime_title=None, provider=0):
     if not cfg.get("history_tracking", True):
         return
     slug_key = f"{slug}_{provider}"
-    db_path = get_db_path()
     try:
-        conn = sqlite3.connect(db_path)
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("INSERT OR REPLACE INTO shows (slug, last_watched) VALUES (?, ?)", (slug_key, episode_num))
         cursor.execute("INSERT OR IGNORE INTO watched_episodes (slug, episode) VALUES (?, ?)", (slug_key, episode_num))
         conn.commit()
         conn.close()
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[animeiat-cli] Warning: add_watch_history failed: {e}")
 
     sync_watch_progress_bg(slug, anime_title, episode_num)
 
 
 def get_watch_history(slug, provider=0):
     slug_key = f"{slug}_{provider}"
-    db_path = get_db_path()
     try:
-        conn = sqlite3.connect(db_path)
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT last_watched FROM shows WHERE slug = ?", (slug_key,))
         row = cursor.fetchone()
@@ -366,15 +372,15 @@ def get_watch_history(slug, provider=0):
         watched = [r[0] for r in cursor.fetchall()]
         conn.close()
         return {"last_watched": last_watched, "watched": watched}
-    except Exception:
+    except Exception as e:
+        print(f"[animeiat-cli] Warning: get_watch_history failed: {e}")
         return {"last_watched": 0, "watched": []}
 
 
 def save_account_token(platform, token, client_id=None, refresh_token=None, expires_in=None):
-    db_path = get_db_path()
     expires_at = time.time() + expires_in if expires_in else None
     try:
-        conn = sqlite3.connect(db_path)
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute(
             "INSERT OR REPLACE INTO accounts (platform, token, client_id, refresh_token, expires_at) VALUES (?, ?, ?, ?, ?)",
@@ -383,14 +389,14 @@ def save_account_token(platform, token, client_id=None, refresh_token=None, expi
         conn.commit()
         conn.close()
         return True
-    except Exception:
+    except Exception as e:
+        print(f"[animeiat-cli] Warning: save_account_token failed: {e}")
         return False
 
 
 def get_account_token(platform):
-    db_path = get_db_path()
     try:
-        conn = sqlite3.connect(db_path)
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT token, client_id, refresh_token, expires_at FROM accounts WHERE platform = ?", (platform,))
         row = cursor.fetchone()
@@ -402,21 +408,21 @@ def get_account_token(platform):
                 "refresh_token": row[2],
                 "expires_at": row[3]
             }
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[animeiat-cli] Warning: get_account_token failed: {e}")
     return None
 
 
 def remove_account(platform):
-    db_path = get_db_path()
     try:
-        conn = sqlite3.connect(db_path)
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("DELETE FROM accounts WHERE platform = ?", (platform,))
         conn.commit()
         conn.close()
         return True
-    except Exception:
+    except Exception as e:
+        print(f"[animeiat-cli] Warning: remove_account failed: {e}")
         return False
 
 
@@ -436,8 +442,8 @@ def refresh_mal_token(client_id, refresh_token):
             expires_in = data.get("expires_in", 2419200)
             save_account_token("myanimelist", access_token, client_id, new_refresh, expires_in)
             return access_token
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[animeiat-cli] Warning: refresh_mal_token failed: {e}")
     return None
 
 
@@ -614,7 +620,8 @@ def fetch_anime_metadata(search_term):
         }
         _metadata_cache[key] = result
         return result
-    except Exception:
+    except Exception as e:
+        print(f"[animeiat-cli] Warning: fetch_anime_metadata failed: {e}")
         _metadata_cache[key] = None
         return None
 
@@ -638,7 +645,8 @@ def fetch_anilist_user_list(token, status_filter=None):
         user_id = viewer_data.get("data", {}).get("Viewer", {}).get("id")
         if not user_id:
             return []
-    except Exception:
+    except Exception as e:
+        print(f"[animeiat-cli] Warning: fetch_anilist_user_list viewer query failed: {e}")
         return []
 
     list_query = """
@@ -685,7 +693,8 @@ def fetch_anilist_user_list(token, status_filter=None):
                     "title_romaji": title.get("romaji"),
                 })
         return results
-    except Exception:
+    except Exception as e:
+        print(f"[animeiat-cli] Warning: fetch_anilist_user_list list query failed: {e}")
         return []
 
 
@@ -719,5 +728,6 @@ def fetch_mal_user_list(token, status_filter=None):
                 "title_romaji": None,
             })
         return results
-    except Exception:
+    except Exception as e:
+        print(f"[animeiat-cli] Warning: fetch_mal_user_list failed: {e}")
         return []

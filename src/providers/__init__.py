@@ -1,10 +1,13 @@
 import asyncio
+import difflib
+import re
+import sys
 import time
 from typing import Any, Optional, Protocol
 from urllib.parse import urlparse
 
 _search_cache: dict[tuple[str, tuple[int, ...]], tuple[float, dict[int, list[dict[str, Any]]]]] = {}
-_SEARCH_CACHE_TTL = 300  # 5 minutes
+_SEARCH_CACHE_TTL = 300
 
 
 class SourceProvider(Protocol):
@@ -43,15 +46,96 @@ class ProviderRegistry:
 registry = ProviderRegistry()
 
 
+def deduplicate_search_results_multi(provider_results):
+    def _normalize(t):
+        t = t.lower().strip()
+        t = re.sub(r'[\[\]\(\)]', '', t)
+        t = re.sub(r'\s+', ' ', t)
+        t = re.sub(r'\s*(tv|dub|sub|movie|season\s*\d+|part\s*\d+|ova|ona)\s*$', '', t)
+        return t.strip()
+
+    deduped_provider_results = []
+    for pname, results, pid in provider_results:
+        seen_titles = {}
+        deduped = []
+        for title, url in results:
+            norm = _normalize(title)
+            found = False
+            for seen_norm, seen_title, seen_url in seen_titles.values():
+                if difflib.SequenceMatcher(None, norm, seen_norm).ratio() > 0.9:
+                    found = True
+                    break
+            if not found:
+                key = len(deduped)
+                deduped.append((title, url))
+                seen_titles[key] = (norm, title, url)
+        deduped_provider_results.append((pname, deduped, pid))
+
+    all_items = []
+    for pname, results, pid in deduped_provider_results:
+        for title, url in results:
+            all_items.append((title, url, pname, pid))
+
+    groups = []
+    used = set()
+
+    for i, (title, url, pname, pid) in enumerate(all_items):
+        if i in used:
+            continue
+        norm_i = _normalize(title)
+        group = [(pname, url, pid)]
+        used.add(i)
+        group_pids = {pid}
+
+        for j in range(i + 1, len(all_items)):
+            if j in used:
+                continue
+            title_j, url_j, pname_j, pid_j = all_items[j]
+            if pid_j in group_pids:
+                continue
+            norm_j = _normalize(title_j)
+            ratio = difflib.SequenceMatcher(None, norm_i, norm_j).ratio()
+            if ratio > 0.6:
+                group.append((pname_j, url_j, pid_j))
+                used.add(j)
+                group_pids.add(pid_j)
+                if len(title_j) > len(title):
+                    title = title_j
+
+        groups.append((title, group))
+
+    groups.sort(key=lambda x: -len(x[1]))
+    return groups
+
+
+def search_providers_for_media(title):
+    try:
+        providers_list = registry.get_all()
+
+        async def _search():
+            tasks = [p.search(title) for p in providers_list]
+            res = await asyncio.gather(*tasks, return_exceptions=True)
+            providers = []
+            for i, p in enumerate(providers_list):
+                data = res[i] if isinstance(res[i], list) else []
+                items = [(item["title"], item["url"]) for item in data]
+                providers.append((p.provider_name, items, p.provider_id))
+            deduped = deduplicate_search_results_multi(providers)
+            if deduped:
+                entry = deduped[0]
+                pname, url, flag = entry[1][0]
+                return (entry[0], url, flag)
+            return None
+        return asyncio.run(_search())
+    except Exception as e:
+        print(f"[animeiat-cli] Warning: search_providers_for_media failed: {e}")
+        return None
+
+
 async def search_all_providers(
     query: str,
     provider_ids: list[int] | None = None,
 ) -> dict[int, list[dict[str, Any]]]:
-    """Search providers, returning results keyed by provider_id (no cross-provider dedup).
-    Results are cached in-memory for 5 minutes per (query, provider_ids) key.
-
-    Returns {provider_id: [{"title": str, "url": str}, ...]}
-    """
     providers = registry.get_all()
     if provider_ids is not None:
         providers = [p for p in providers if p.provider_id in provider_ids]
@@ -75,8 +159,7 @@ async def search_all_providers(
         if isinstance(data, list):
             results[p.provider_id] = data
         else:
-            import sys as _sys
-            print(f"[animeiat-cli] Warning: {p.provider_name} search error: {data}", file=_sys.stderr)
+            print(f"[animeiat-cli] Warning: {p.provider_name} search error: {data}", file=sys.stderr)
             results[p.provider_id] = []
 
     _search_cache[cache_key] = (now, results)
@@ -84,7 +167,6 @@ async def search_all_providers(
 
 
 def detect_provider(url: str) -> Optional["SourceProvider"]:
-    """Detect which provider handles a given URL based on domain patterns."""
     parsed = urlparse(url)
     netloc = parsed.netloc.lower()
 

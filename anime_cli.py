@@ -21,10 +21,8 @@ def check_and_install_dependencies():
     except ImportError:
         try:
             from Crypto.Cipher import AES
+            crypto_installed = True
         except ImportError:
-            pass
-        except ImportError:
-            pass
             pass
 
     missing_packages = []
@@ -40,6 +38,7 @@ def check_and_install_dependencies():
     if missing_packages:
         print("Missing required libraries: " + ", ".join(missing_packages))
         print("Attempting to install them automatically...")
+        import os
         import sys
         import subprocess
 
@@ -61,9 +60,6 @@ def check_and_install_dependencies():
                     sys.exit(1)
             else:
                 print(f"Error installing dependencies.")
-                print("Please install them manually using: pip install " + " ".join(missing_packages))
-                sys.exit(1)
-                print(f"Error installing dependencies: {e}")
                 print("Please install them manually using: pip install " + " ".join(missing_packages))
                 sys.exit(1)
 

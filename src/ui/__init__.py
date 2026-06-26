@@ -25,7 +25,6 @@ from .tui import (
     check_for_update,
     TRACK_DEFAULTS,
     _show_track_selector,
-    _simple_read_line,
     get_context_panel,
     _show_help_panel,
     interactive_select,
