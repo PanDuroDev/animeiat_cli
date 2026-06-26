@@ -22,6 +22,7 @@ from src.playback.launch import (
 )
 from src.playback.progress import (
     start_progress_tracking,
+    stop_progress_tracking,
     poll_mpv_progress,
 )
 
@@ -45,5 +46,6 @@ __all__ = [
     "play_with_celluloid",
     "play_with_haruna",
     "start_progress_tracking",
+    "stop_progress_tracking",
     "poll_mpv_progress",
 ]

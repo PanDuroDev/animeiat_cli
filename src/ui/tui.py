@@ -15,8 +15,6 @@ import json
 import os
 import re
 import shutil
-import sqlite3
-import subprocess
 import sys
 import time
 from urllib.parse import urlparse, quote_plus
@@ -32,38 +30,38 @@ from rich.text import Text
 from rich.markup import escape
 from rich import box as rich_box
 
-from config import (
+from src.config import (
     APP_VERSION, THEME, console, get_icon, get_provider_name,
     get_config_dir, get_config_path, load_config, save_config,
     add_search_history, get_http_client, write_custom_config_dir,
     _config_cache,
 )
-from db import (
-    get_db_path, init_db, migrate_json_to_sqlite,
+from src.db import (
+    get_db_path, get_db_connection,
+    init_db, migrate_json_to_sqlite,
     toggle_favorite_state, is_favorite_slug,
     add_watch_history, get_watch_history,
     save_account_token, get_account_token, remove_account,
     fetch_anime_metadata,
     fetch_anilist_user_list, fetch_mal_user_list,
-    cache_stream_url, get_cached_stream_url,
     get_all_episode_progress,
     add_download_entry, get_downloads, remove_download_entry, update_download_status,
 )
-from player import (
+from src.cache import cache_stream_url, get_cached_stream_url
+from src.playback.discovery import (
     get_cached_players, clear_player_cache,
     find_vlc, find_mpv, find_iina, find_celluloid, find_haruna,
     install_player,
+)
+from src.playback.launch import (
     play_with_vlc, play_with_mpv, play_with_iina,
     play_with_celluloid, play_with_haruna,
-    _invalidate_player_cfg as invalidate_player_cfg,
 )
-from scraping import (
-    validate_url, extract_slug, get_preferred_cookies,
-    deduplicate_search_results, deduplicate_search_results_multi,
-    search_providers_for_media,
-    fetch_episodes_list_async, scrape_multiple_streams_async,
-)
-from src.providers import registry as provider_registry
+from src.playback.discovery import _invalidate_player_cfg as invalidate_player_cfg
+from src.providers._utils import validate_url, extract_slug
+from src.providers._cookies import get_preferred_cookies
+from src.providers._scraper import fetch_episodes_list_async, scrape_multiple_streams_async
+from src.providers import registry as provider_registry, search_providers_for_media
 
 # ── Constants ────────────────────────────────────────────────
 _ANIM_DURATION = 0.3
@@ -418,8 +416,8 @@ def check_for_update(current_version):
             latest = resp.text.strip()
             _update_cache["latest"] = latest
             return latest, latest != current_version
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[animeiat-cli] Warning: update check failed: {e}")
     return None
 
 
@@ -469,8 +467,7 @@ def _show_track_selector(track_info=None):
         if key in (KEY_ESC, KEY_CTRL_C):
             return None
         if key == 'a':
-            console.print(f"\n[{THEME['accent']}]Enter audio track ID (or leave empty for auto):[/{THEME['accent']}] ", end="")
-            raw = _simple_read_line()
+            raw = _centered_prompt("Enter audio track ID (or leave empty for auto)")
             if raw:
                 try:
                     track_info["audio_id"] = int(raw)
@@ -481,8 +478,7 @@ def _show_track_selector(track_info=None):
             track_info["audio_id"] = None
             track_info["audio_lang"] = None
         elif key == 's':
-            console.print(f"\n[{THEME['accent']}]Enter subtitle track ID (or leave empty for off):[/{THEME['accent']}] ", end="")
-            raw = _simple_read_line()
+            raw = _centered_prompt("Enter subtitle track ID (or leave empty for off)")
             if raw:
                 try:
                     track_info["sub_id"] = int(raw)
@@ -492,21 +488,6 @@ def _show_track_selector(track_info=None):
         elif key == 'S':
             track_info["sub_id"] = None
             track_info["sub_lang"] = None
-
-
-def _simple_read_line():
-    buf = []
-    while True:
-        k = read_key()
-        if k == KEY_ENTER:
-            return "".join(buf)
-        if k in (KEY_ESC, KEY_CTRL_C):
-            return None
-        if k in ('\x08', '\x7f'):
-            if buf:
-                buf.pop()
-        elif isinstance(k, str) and k.isprintable():
-            buf.append(k)
 
 
 def get_context_panel(context_type, selected_idx, options, metadata=None):
@@ -686,7 +667,7 @@ def get_context_panel(context_type, selected_idx, options, metadata=None):
     )
 
 
-def _show_help_panel(help_items, title="Keyboard Shortcuts"):
+def _show_help_panel(help_items, title="Keyboard Shortcuts", live=None):
     table = Table(show_header=True, header_style=f"bold {THEME['accent']}", border_style=THEME['border'], box=rich_box.ROUNDED)
     table.add_column("Key", style=f"bold {THEME['primary']}")
     table.add_column("Action", style=THEME['fg'])
@@ -694,8 +675,12 @@ def _show_help_panel(help_items, title="Keyboard Shortcuts"):
         table.add_row(key, action)
     panel = Panel(table, title=f"[bold {THEME['primary']}] {title} [/bold {THEME['primary']}]", border_style=THEME['border'], padding=(1, 2))
     w, h = shutil.get_terminal_size()
-    console.clear()
-    console.print(Align(panel, align="center", vertical="middle", height=h))
+    rendered = Align(panel, align="center", vertical="middle", height=h)
+    if live:
+        live.update(rendered)
+    else:
+        console.clear()
+        console.print(rendered)
     read_key()
 
 
@@ -863,7 +848,7 @@ def interactive_select(options, title="Select Option", context_type=None, metada
             if not _anim_active:
                 return None
             while _anim_active:
-                live.update(make_panel())
+                _sync_update()
                 if os.name == 'nt' and msvcrt.kbhit():
                     return read_key()
                 elif os.name != 'nt':
@@ -876,15 +861,21 @@ def interactive_select(options, title="Select Option", context_type=None, metada
                     _anim_active = False
                     break
                 time.sleep(0.05)
-            live.update(make_panel())
+            _sync_update()
             return None
 
         with RawModeContext():
             with Live(None, refresh_per_second=_REFRESH_RATE, transient=False) as live:
-                live.update(make_panel())
+                def _sync_update(renderable=None):
+                    if renderable is None:
+                        renderable = make_panel()
+                    sys.stdout.write("\033[?2026h")
+                    live.update(renderable)
+                    sys.stdout.write("\033[?2026l")
+                _sync_update()
                 while True:
                     key = read_key()
-
+                    
                     if _filter_active:
                         if key == KEY_ENTER:
                             _filter_active = False
@@ -900,7 +891,7 @@ def interactive_select(options, title="Select Option", context_type=None, metada
                             _filter_buf = _filter_buf[:-1]
                         elif isinstance(key, str) and key.isprintable():
                             _filter_buf += key
-                        live.update(make_panel())
+                        _sync_update()
                         continue
 
                     display = _cached_display
@@ -921,17 +912,17 @@ def interactive_select(options, title="Select Option", context_type=None, metada
                     elif key in ('d', 'D'):
                         if context_type:
                             _show_details = not _show_details
-                            live.update(make_panel())
+                            _sync_update()
                     elif key == '/':
                         _filter_active = True
                         _filter_buf = ""
-                        live.update(make_panel())
+                        _sync_update()
                     elif key in ('s', 'S'):
                         sort_mode = (sort_mode + 1) % 3
                         _rebuild_order()
                         _update_right_cache()
                         selected_idx = 0
-                        live.update(make_panel())
+                        _sync_update()
                     elif key in ('?', 'h', 'H'):
                         _show_help_panel([
                             ("\u2191 / \u2193", "Navigate list"),
@@ -941,15 +932,15 @@ def interactive_select(options, title="Select Option", context_type=None, metada
                             ("/", "Filter results by text"),
                             ("s", "Cycle sort order"),
                             ("g / G", "Go to first / last"),
-                        ], "Navigation Help")
-                        live.update(make_panel())
+                        ], "Navigation Help", live=live)
+                        _sync_update()
                     elif key in ('q', 'Q'):
                         if filter_text:
                             filter_text = ""
                             _rebuild_order()
                             _update_right_cache()
                             selected_idx = 0
-                            live.update(make_panel())
+                            _sync_update()
                         else:
                             return -1, None
                     elif key == KEY_ENTER:
@@ -962,7 +953,7 @@ def interactive_select(options, title="Select Option", context_type=None, metada
                             _rebuild_order()
                             _update_right_cache()
                             selected_idx = 0
-                            live.update(make_panel())
+                            _sync_update()
                         else:
                             return -1, None
                     elif key in ('g', 'G'):
@@ -1130,7 +1121,7 @@ def interactive_checklist(options, title="Select Episodes", default_start_idx=0,
             if not _anim_active:
                 return None
             while _anim_active:
-                live.update(make_panel())
+                _sync_update()
                 if os.name == 'nt' and msvcrt.kbhit():
                     return read_key()
                 elif os.name != 'nt':
@@ -1143,15 +1134,21 @@ def interactive_checklist(options, title="Select Episodes", default_start_idx=0,
                     _anim_active = False
                     break
                 time.sleep(0.05)
-            live.update(make_panel())
+            _sync_update()
             return None
 
         with RawModeContext():
             with Live(None, refresh_per_second=_REFRESH_RATE, transient=False) as live:
-                live.update(make_panel())
+                def _sync_update(renderable=None):
+                    if renderable is None:
+                        renderable = make_panel()
+                    sys.stdout.write("\033[?2026h")
+                    live.update(renderable)
+                    sys.stdout.write("\033[?2026l")
+                _sync_update()
                 while True:
                     key = read_key()
-
+                    
                     # ── Input mode (jump-to-episode) ───────────
                     if _input_active:
                         if key == KEY_ENTER:
@@ -1174,7 +1171,7 @@ def interactive_checklist(options, title="Select Episodes", default_start_idx=0,
                             _input_buf = _input_buf[:-1]
                         elif isinstance(key, str) and key.isdigit():
                             _input_buf += key
-                        live.update(make_panel())
+                        _sync_update()
                         continue
 
                     now = time.time()
@@ -1201,19 +1198,19 @@ def interactive_checklist(options, title="Select Episodes", default_start_idx=0,
                     elif key in ('d', 'D'):
                         if context_type:
                             _show_details = not _show_details
-                            live.update(make_panel())
+                            _sync_update()
                     elif key == KEY_SPACE:
                         checked[selected_idx] = not checked[selected_idx]
                         _last_drag_time = now
-                        live.update(make_panel())
+                        _sync_update()
                     elif key == KEY_A:
                         all_checked = all(checked)
                         checked = [not all_checked] * len(options)
-                        live.update(make_panel())
+                        _sync_update()
                     elif key in ('f', 'F'):
                         if on_toggle_favorite:
                             is_favorite = on_toggle_favorite()
-                            live.update(make_panel())
+                            _sync_update()
                     elif key == '[':
                         _anim_old_scroll = scroll_offset
                         _anim_start = time.monotonic()
@@ -1235,7 +1232,7 @@ def interactive_checklist(options, title="Select Episodes", default_start_idx=0,
                     elif key in ('j', 'J'):
                         _input_active = True
                         _input_buf = ""
-                        live.update(make_panel())
+                        _sync_update()
                     elif key in ('?', 'h', 'H'):
                         _show_help_panel([
                             ("\u2191 / \u2193", "Navigate list"),
@@ -1248,8 +1245,8 @@ def interactive_checklist(options, title="Select Episodes", default_start_idx=0,
                             ("g / G", "Go to first / last"),
                             ("Enter", "Scrape & play selected"),
                             ("Esc", "Go back"),
-                        ], "Episode Selection Help")
-                        live.update(make_panel())
+                        ], "Episode Selection Help", live=live)
+                        _sync_update()
                     elif key == KEY_ENTER:
                         return [idx for idx, val in enumerate(checked) if val]
                     elif key in (KEY_ESC, KEY_CTRL_C):
@@ -1276,7 +1273,7 @@ def _handle_main_menu(current, stack, ctx):
     ]
     fav_count = 0
     try:
-        conn = sqlite3.connect(get_db_path())
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM favorites")
         fav_count = cursor.fetchone()[0]
@@ -1600,10 +1597,9 @@ def _handle_url_input(current, stack, ctx):
 
 
 def _handle_favorites(current, stack, ctx):
-    db_path = get_db_path()
     favs = []
     try:
-        conn = sqlite3.connect(db_path)
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT slug, title, url, is_witanime FROM favorites")
         for row in cursor.fetchall():
@@ -1682,7 +1678,6 @@ def _handle_settings(current, stack, ctx):
 
 
 def _settings_player(cfg):
-    from config import _config_cache
     history_enabled = cfg.get("history_tracking", True)
     fullscreen_enabled = cfg.get("fullscreen", False)
     player_args = cfg.get("custom_player_args", "")
@@ -1863,7 +1858,7 @@ def _settings_data_sync(cfg, stack):
             if confirm is None or confirm.strip().lower() != "yes":
                 continue
             try:
-                conn = sqlite3.connect(get_db_path())
+                conn = get_db_connection()
                 cursor = conn.cursor()
                 cursor.execute("DELETE FROM favorites")
                 cursor.execute("DELETE FROM shows")
@@ -1943,7 +1938,6 @@ def _settings_about(ctx):
     celluloid_ok = players.get("celluloid") is not None
     haruna_ok = players.get("haruna") is not None
 
-    _ = os.name
     anilist_token = get_account_token("anilist")
     mal_token = get_account_token("myanimelist")
 
@@ -1990,7 +1984,8 @@ def _settings_about(ctx):
     if key in ("u", "U"):
         update = check_for_update(APP_VERSION)
         if update:
-            _centered_message(f"Current version: {APP_VERSION}\nLatest version: {update.get('v', {}).get('version', '?')}\nPress 'u' in main menu to update.", level="info")
+            latest, _ = update
+            _centered_message(f"Current version: {APP_VERSION}\nLatest version: {latest}\nPress 'u' in main menu to update.", level="info")
         else:
             _centered_message(f"Current version: {APP_VERSION}\nYou are up to date!", level="info")
 
@@ -2004,8 +1999,6 @@ def _handle_episode_selection(current, stack, ctx):
     active_player = ctx["active_player"]
     player_name = ctx["player_name"]
     pref_player = ctx["pref_player"]
-    vlc = ctx["vlc"]; mpv = ctx["mpv"]; iina = ctx["iina"]
-    celluloid = ctx["celluloid"]; haruna = ctx["haruna"]
 
     history_data = get_watch_history(slug, provider=is_witanime)
     last_watched = history_data.get("last_watched", 0)
@@ -2027,7 +2020,7 @@ def _handle_episode_selection(current, stack, ctx):
             empty = 10 - filled
             bar_str = f" [dim {THEME['dim']}][[/dim {THEME['dim']}]{'█' * filled}{'░' * empty}[dim {THEME['dim']}]][/dim {THEME['dim']}] [bold {THEME['accent']}]{int(pct * 100)}%[/bold {THEME['accent']}]"
         if ep_num in watched_list:
-            ep_options.append(f"Episode {ep_num}{bar_str} [dim {THEME['dim']}](watched {get_icon('check').strip()})[/dim {THEME['dim']}]")
+            ep_options.append(f"Episode {ep_num}{bar_str} [dim {THEME['dim']}](watched ✓)[/dim {THEME['dim']}]")
         else:
             ep_options.append(f"Episode {ep_num}{bar_str}")
     fav_status = is_favorite_slug(slug)
@@ -2181,13 +2174,13 @@ def _handle_episode_selection(current, stack, ctx):
         if player_name == "MPV":
             launch_success = play_with_mpv(stream_urls, slug=slug, ep=eps_to_scrape[0]["episode"], extra_args=track_args)
         elif player_name == "VLC":
-            launch_success = play_with_vlc(stream_urls)
+            launch_success = play_with_vlc(stream_urls, extra_args=track_args)
         elif player_name == "IINA":
-            launch_success = play_with_iina(stream_urls)
+            launch_success = play_with_iina(stream_urls, extra_args=track_args)
         elif player_name == "Celluloid":
-            launch_success = play_with_celluloid(stream_urls)
+            launch_success = play_with_celluloid(stream_urls, extra_args=track_args)
         elif player_name == "Haruna":
-            launch_success = play_with_haruna(stream_urls)
+            launch_success = play_with_haruna(stream_urls, extra_args=track_args)
         if launch_success:
             for ep_num in ep_numbers:
                 add_watch_history(slug, ep_num, anime_title, provider=is_witanime)
@@ -2208,9 +2201,8 @@ def _handle_export():
     if f_idx == -1:
         return
 
-    db_path = get_db_path()
     try:
-        conn = sqlite3.connect(db_path)
+        conn = get_db_connection()
         cursor = conn.cursor()
 
         cursor.execute("SELECT slug, last_watched FROM shows ORDER BY slug")
@@ -2296,7 +2288,7 @@ def _handle_download_manager(current, stack, ctx):
 
 def _handle_continue_watching(current, stack, ctx):
     try:
-        conn = sqlite3.connect(get_db_path())
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("""
             SELECT DISTINCT s.slug, s.last_watched
@@ -2325,7 +2317,7 @@ def _handle_continue_watching(current, stack, ctx):
         title = bare_slug
         anime_url = ""
         try:
-            conn = sqlite3.connect(get_db_path())
+            conn = get_db_connection()
             c = conn.cursor()
             c.execute("SELECT title, url FROM favorites WHERE slug = ?", (bare_slug,))
             fav_row = c.fetchone()
@@ -2333,8 +2325,8 @@ def _handle_continue_watching(current, stack, ctx):
                 title = fav_row[0] if fav_row[0] else bare_slug
                 anime_url = fav_row[1] if fav_row[1] else ""
             conn.close()
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[animeiat-cli] Warning: continue watching fav lookup failed: {e}")
         items.append({"slug": bare_slug, "title": title, "url": anime_url, "is_witanime": provider, "last_watched": last_watched})
     if not items:
         _centered_message("No watch history found. Watch some episodes first!", level="info")
@@ -2421,7 +2413,6 @@ def run_app(initial_url=None, player_override=None, quality_override=None):
             "FAVORITES": "Favorites Library",
             "SETTINGS": "Configuration Settings",
             "EPISODE_SELECTION": f"Episodes: {current.get('slug', '')}",
-            "PLAYBACK": f"Playing: {current.get('slug', '')}",
         }
         set_terminal_title(title_map.get(state, "Anime CLI Player"))
 

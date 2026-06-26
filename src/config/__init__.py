@@ -62,8 +62,8 @@ def read_custom_config_dir():
             path = f.read().strip()
             if path and os.path.isabs(path):
                 return path
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[animeiat-cli] Warning: read_custom_config_dir failed: {e}")
     return None
 
 
@@ -72,8 +72,8 @@ def write_custom_config_dir(path):
     try:
         with open(ptr, "w", encoding="utf-8") as f:
             f.write(path.strip())
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[animeiat-cli] Warning: write_custom_config_dir failed: {e}")
 
 
 def get_default_config_dir():
@@ -113,7 +113,8 @@ def _migrate_config_dir(new_dir):
             continue
         try:
             shutil.copytree(old_dir, new_dir, dirs_exist_ok=True)
-        except Exception:
+        except Exception as e:
+            print(f"[animeiat-cli] Warning: config migration copy failed: {e}")
             continue
         ok = True
         for root, dirs, files in os.walk(old_dir):
@@ -136,16 +137,16 @@ def _migrate_config_dir(new_dir):
         else:
             try:
                 shutil.rmtree(new_dir)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[animeiat-cli] Warning: failed to clean up new dir during migration: {e}")
 
     old_ptr = os.path.join(os.path.expanduser("~"), ".pyanime_config_path")
     new_ptr = get_config_path_pointer()
     if os.path.exists(old_ptr) and not os.path.exists(new_ptr):
         try:
             shutil.copy2(old_ptr, new_ptr)
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[animeiat-cli] Warning: config path pointer copy failed: {e}")
 
 
 def _hash_file(fpath):
@@ -154,8 +155,8 @@ def _hash_file(fpath):
         with open(fpath, "rb") as f:
             for chunk in iter(lambda: f.read(65536), b""):
                 h.update(chunk)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[animeiat-cli] Warning: _hash_file failed: {e}")
     return h.hexdigest()
 
 
@@ -195,7 +196,8 @@ def load_config():
             _config_cache = cfg
             _nerd_fonts_enabled = cfg.get("nerd_fonts", False)
             return _config_cache
-    except Exception:
+    except Exception as e:
+        print(f"[animeiat-cli] Warning: load_config failed, using defaults: {e}")
         _config_cache = default_cfg
         _nerd_fonts_enabled = default_cfg["nerd_fonts"]
         return _config_cache
@@ -250,11 +252,11 @@ def get_icon(name):
         "search": "⚲ ",
         "favorite_on": "★ ",
         "favorite_off": "☆ ",
-        "direct_url": "🔗 ",
+        "direct_url": "↗ ",
         "settings": "⚙ ",
         "exit": "⏻ ",
         "play": "▶ ",
-        "watch_history": "⏳ ",
+        "watch_history": "↻ ",
         "check": "✔ ",
         "cross": "✘ ",
         "warning": "⚠ ",
@@ -262,7 +264,7 @@ def get_icon(name):
         "bullet": "❯ ",
         "arrow_up": "▲ ",
         "arrow_down": "▼ ",
-        "folder": "📁 ",
+        "folder": "▣ ",
         "download": "⬇ ",
         "sparkle": "✦ "
     }

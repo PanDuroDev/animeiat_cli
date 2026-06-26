@@ -4,7 +4,7 @@ import subprocess
 import sys
 import time
 
-from config import load_config, THEME, console, get_icon
+from src.config import load_config, THEME, console, get_icon
 
 
 _cached_players = {}
@@ -222,7 +222,7 @@ def install_player(player_name):
             console.print(f"[bold {THEME['warning']}]IINA is a macOS-only player.[/bold {THEME['warning']}]")
         else:
             console.print(f"[bold {THEME['warning']}]{player_name.upper()} is a Linux-oriented player. We recommend installing MPV or VLC on Windows.[/bold {THEME['warning']}]")
-        time.sleep(4.0)
+        console.input(f"\n[{THEME['dim']}]Press Enter to continue...[/{THEME['dim']}]")
         return False
 
     if sys.platform == "darwin":
@@ -237,13 +237,13 @@ def install_player(player_name):
                 result = subprocess.run(cmd, timeout=300)
                 if result.returncode == 0:
                     console.print(f"[bold {THEME['success']}]{get_icon('check')}{player_name.upper()} installed successfully via Homebrew![/bold {THEME['success']}]")
-                    time.sleep(2.0)
+                    console.input(f"\n[{THEME['dim']}]Press Enter to continue...[/{THEME['dim']}]")
                     return True
             except Exception as e:
                 print(f"[animeiat-cli] Warning: player install failed: {e}")
                 console.print(f"\n[bold {THEME['error']}]{get_icon('cross')}Could not auto-install {player_name.upper()} on macOS.[/bold {THEME['error']}]")
                 console.print(f"[bold {THEME['warning']}]{get_icon('warning')}Please install it manually from the official website or using Homebrew.[/bold {THEME['warning']}]")
-                time.sleep(3.0)
+                console.input(f"\n[{THEME['dim']}]Press Enter to continue...[/{THEME['dim']}]")
                 return False
 
     if os.name == 'nt':
@@ -301,13 +301,13 @@ def install_player(player_name):
         if installed:
             console.print(f"[{THEME['dim']}]  Refreshing system PATH...[/{THEME['dim']}]")
             refresh_system_path()
-            time.sleep(2.0)
+            time.sleep(0.5)
             found = find_mpv() if player_name == "mpv" else find_vlc()
             if found:
                 console.print(f"[bold {THEME['success']}]{get_icon('check')}{player_name.upper()} verified at: {found}[/bold {THEME['success']}]")
             else:
                 console.print(f"[bold {THEME['warning']}]{get_icon('warning')}Installed but path not detected yet. Searching deeper...[/bold {THEME['warning']}]")
-                time.sleep(1.0)
+                time.sleep(0.5)
             return True
 
         console.print(f"\n[bold {THEME['error']}]{get_icon('cross')}Could not auto-install {player_name.upper()} on Windows.[/bold {THEME['error']}]")
@@ -318,7 +318,7 @@ def install_player(player_name):
         else:
             console.print(f"[{THEME['dim']}]  Download: https://www.videolan.org/vlc/[/{THEME['dim']}]")
             console.print(f"[{THEME['dim']}]  Or run: winget install VideoLAN.VLC[/{THEME['dim']}]")
-        time.sleep(3.0)
+        console.input(f"\n[{THEME['dim']}]Press Enter to continue...[/{THEME['dim']}]")
         return False
 
     else:
@@ -339,7 +339,7 @@ def install_player(player_name):
                     result = subprocess.run(cmd, timeout=300)
                     if result.returncode == 0:
                         console.print(f"[bold {THEME['success']}]{get_icon('check')}{player_name.upper()} installed successfully via {pm_name}![/bold {THEME['success']}]")
-                        time.sleep(2.0)
+                        console.input(f"\n[{THEME['dim']}]Press Enter to continue...[/{THEME['dim']}]")
                         return True
                 except FileNotFoundError:
                     continue
@@ -365,12 +365,12 @@ def install_player(player_name):
                     result = subprocess.run(cmd, timeout=300)
                     if result.returncode == 0:
                         console.print(f"[bold {THEME['success']}]{get_icon('check')}{player_name.upper()} installed successfully via Flatpak![/bold {THEME['success']}]")
-                        time.sleep(2.0)
+                        console.input(f"\n[{THEME['dim']}]Press Enter to continue...[/{THEME['dim']}]")
                         return True
             except Exception as e:
                 print(f"[animeiat-cli] Warning: player install subprocess failed: {e}")
 
         console.print(f"\n[bold {THEME['error']}]{get_icon('cross')}Could not auto-install {player_name.upper()} on this system.[/bold {THEME['error']}]")
         console.print(f"[bold {THEME['warning']}]{get_icon('warning')}Please install manually using your package manager.[/bold {THEME['warning']}]")
-        time.sleep(3.0)
+        console.input(f"\n[{THEME['dim']}]Press Enter to continue...[/{THEME['dim']}]")
         return False

@@ -3,31 +3,33 @@ CLI entry points for animeiat-cli — argument parsing, non-interactive mode, an
 """
 
 import argparse
+import asyncio
 import atexit
 import json
 import os
 import sys
-import time
+import traceback
 from urllib.parse import urlparse
 
-from config import (
+from src.config import (
     APP_VERSION, THEME, console, load_config, _config_cache,
 )
-from db import (
+from src.db import (
     get_db_path, init_db, migrate_json_to_sqlite,
-    add_watch_history, get_cached_stream_url, add_download_entry,
+    add_watch_history, add_download_entry,
 )
-from player import (
+from src.cache import get_cached_stream_url
+from src.playback.discovery import (
     get_cached_players,
     find_vlc, find_mpv, find_iina, find_celluloid, find_haruna,
+)
+from src.playback.launch import (
     play_with_vlc, play_with_mpv, play_with_iina,
     play_with_celluloid, play_with_haruna,
 )
-from scraping import (
-    validate_url, extract_slug, get_preferred_cookies,
-    fetch_episodes_list_async, scrape_multiple_streams_async,
-    search_providers_for_media,
-)
+from src.providers._utils import validate_url, extract_slug
+from src.providers._cookies import get_preferred_cookies
+from src.providers._scraper import fetch_episodes_list_async, scrape_multiple_streams_async
 
 from .tui import (
     clear_screen, enter_alt_screen, exit_alt_screen, run_app,
@@ -40,18 +42,11 @@ def _show_cursor():
     sys.stdout.flush()
 
 
-link_anilist_flow = None
-link_myanimelist_flow = None
-
-
 def run_noninteractive(initial_url, player_override=None, quality_override=None,
                        json_output=False, list_episodes=False, download_mode=False):
-    from urllib.parse import urlparse as _urlparse
-    import json as _json
-
     def _emit(data_dict, exit_code=0):
         if json_output:
-            print(_json.dumps(data_dict, ensure_ascii=False, indent=2))
+            print(json.dumps(data_dict, ensure_ascii=False, indent=2))
         else:
             for k, v in data_dict.items():
                 if v is not None:
@@ -64,7 +59,7 @@ def run_noninteractive(initial_url, player_override=None, quality_override=None,
         _emit({"error": f"Invalid URL \u2014 {err_msg}", "success": False}, exit_code=1)
 
     anime_url = initial_url.strip()
-    p = _urlparse(anime_url)
+    p = urlparse(anime_url)
     is_witanime = 1 if "witanime" in p.netloc else 2 if "anitaku" in p.netloc or "gogoanime" in p.netloc or "anineko" in p.netloc else 0
     slug = extract_slug(anime_url)
     if not slug:
@@ -80,7 +75,7 @@ def run_noninteractive(initial_url, player_override=None, quality_override=None,
     if not json_output:
         print("Fetching episodes list...")
     try:
-        eps, err = __import__('asyncio').run(fetch_episodes_list_async(anime_url, is_witanime, active_cookies))
+        eps, err = asyncio.run(fetch_episodes_list_async(anime_url, is_witanime, active_cookies))
     except Exception as exc:
         _emit({"error": f"Fetch failed: {exc}", "success": False}, exit_code=1)
 
@@ -104,7 +99,6 @@ def run_noninteractive(initial_url, player_override=None, quality_override=None,
     if not json_output:
         print(f"Scraping stream URL for episode {eps[0]['episode']}...")
     try:
-        import asyncio
         results = asyncio.run(scrape_multiple_streams_async(eps_to_scrape, is_witanime, active_cookies))
     except KeyboardInterrupt:
         _emit({"error": "Scraping cancelled.", "success": False}, exit_code=1)
@@ -254,8 +248,8 @@ def main():
     if sys.stdout.encoding != 'utf-8':
         try:
             sys.stdout.reconfigure(encoding='utf-8')
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[animeiat-cli] Warning: stdout encoding reconfigure failed: {e}")
 
     init_db()
     migrate_json_to_sqlite()
@@ -264,9 +258,12 @@ def main():
         try:
             import ctypes
             kernel32 = ctypes.windll.kernel32
-            kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
-        except Exception:
-            pass
+            handle = kernel32.GetStdHandle(-11)
+            mode = ctypes.c_uint32(0)
+            if kernel32.GetConsoleMode(handle, ctypes.byref(mode)):
+                kernel32.SetConsoleMode(handle, mode.value | 7)
+        except Exception as e:
+            print(f"[animeiat-cli] Warning: console mode set failed: {e}")
 
     if args.no_tui and args.url:
         run_noninteractive(
@@ -285,7 +282,6 @@ def main():
         run_app(initial_url=args.url, player_override=player_override, quality_override=quality_override)
     except Exception as e:
         exit_alt_screen()
-        import traceback
         traceback.print_exc()
         input("\nAn unexpected error occurred. Press Enter to exit...")
     finally:
