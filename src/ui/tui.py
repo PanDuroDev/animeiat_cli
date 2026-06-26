@@ -667,7 +667,7 @@ def get_context_panel(context_type, selected_idx, options, metadata=None):
     )
 
 
-def _show_help_panel(help_items, title="Keyboard Shortcuts"):
+def _show_help_panel(help_items, title="Keyboard Shortcuts", live=None):
     table = Table(show_header=True, header_style=f"bold {THEME['accent']}", border_style=THEME['border'], box=rich_box.ROUNDED)
     table.add_column("Key", style=f"bold {THEME['primary']}")
     table.add_column("Action", style=THEME['fg'])
@@ -675,8 +675,12 @@ def _show_help_panel(help_items, title="Keyboard Shortcuts"):
         table.add_row(key, action)
     panel = Panel(table, title=f"[bold {THEME['primary']}] {title} [/bold {THEME['primary']}]", border_style=THEME['border'], padding=(1, 2))
     w, h = shutil.get_terminal_size()
-    console.clear()
-    console.print(Align(panel, align="center", vertical="middle", height=h))
+    rendered = Align(panel, align="center", vertical="middle", height=h)
+    if live:
+        live.update(rendered)
+    else:
+        console.clear()
+        console.print(rendered)
     read_key()
 
 
@@ -844,7 +848,7 @@ def interactive_select(options, title="Select Option", context_type=None, metada
             if not _anim_active:
                 return None
             while _anim_active:
-                live.update(make_panel())
+                _sync_update()
                 if os.name == 'nt' and msvcrt.kbhit():
                     return read_key()
                 elif os.name != 'nt':
@@ -857,15 +861,21 @@ def interactive_select(options, title="Select Option", context_type=None, metada
                     _anim_active = False
                     break
                 time.sleep(0.05)
-            live.update(make_panel())
+            _sync_update()
             return None
 
         with RawModeContext():
             with Live(None, refresh_per_second=_REFRESH_RATE, transient=False) as live:
-                live.update(make_panel())
+                def _sync_update(renderable=None):
+                    if renderable is None:
+                        renderable = make_panel()
+                    sys.stdout.write("\033[?2026h")
+                    live.update(renderable)
+                    sys.stdout.write("\033[?2026l")
+                _sync_update()
                 while True:
                     key = read_key()
-
+                    
                     if _filter_active:
                         if key == KEY_ENTER:
                             _filter_active = False
@@ -881,7 +891,7 @@ def interactive_select(options, title="Select Option", context_type=None, metada
                             _filter_buf = _filter_buf[:-1]
                         elif isinstance(key, str) and key.isprintable():
                             _filter_buf += key
-                        live.update(make_panel())
+                        _sync_update()
                         continue
 
                     display = _cached_display
@@ -902,17 +912,17 @@ def interactive_select(options, title="Select Option", context_type=None, metada
                     elif key in ('d', 'D'):
                         if context_type:
                             _show_details = not _show_details
-                            live.update(make_panel())
+                            _sync_update()
                     elif key == '/':
                         _filter_active = True
                         _filter_buf = ""
-                        live.update(make_panel())
+                        _sync_update()
                     elif key in ('s', 'S'):
                         sort_mode = (sort_mode + 1) % 3
                         _rebuild_order()
                         _update_right_cache()
                         selected_idx = 0
-                        live.update(make_panel())
+                        _sync_update()
                     elif key in ('?', 'h', 'H'):
                         _show_help_panel([
                             ("\u2191 / \u2193", "Navigate list"),
@@ -922,15 +932,15 @@ def interactive_select(options, title="Select Option", context_type=None, metada
                             ("/", "Filter results by text"),
                             ("s", "Cycle sort order"),
                             ("g / G", "Go to first / last"),
-                        ], "Navigation Help")
-                        live.update(make_panel())
+                        ], "Navigation Help", live=live)
+                        _sync_update()
                     elif key in ('q', 'Q'):
                         if filter_text:
                             filter_text = ""
                             _rebuild_order()
                             _update_right_cache()
                             selected_idx = 0
-                            live.update(make_panel())
+                            _sync_update()
                         else:
                             return -1, None
                     elif key == KEY_ENTER:
@@ -943,7 +953,7 @@ def interactive_select(options, title="Select Option", context_type=None, metada
                             _rebuild_order()
                             _update_right_cache()
                             selected_idx = 0
-                            live.update(make_panel())
+                            _sync_update()
                         else:
                             return -1, None
                     elif key in ('g', 'G'):
@@ -1111,7 +1121,7 @@ def interactive_checklist(options, title="Select Episodes", default_start_idx=0,
             if not _anim_active:
                 return None
             while _anim_active:
-                live.update(make_panel())
+                _sync_update()
                 if os.name == 'nt' and msvcrt.kbhit():
                     return read_key()
                 elif os.name != 'nt':
@@ -1124,15 +1134,21 @@ def interactive_checklist(options, title="Select Episodes", default_start_idx=0,
                     _anim_active = False
                     break
                 time.sleep(0.05)
-            live.update(make_panel())
+            _sync_update()
             return None
 
         with RawModeContext():
             with Live(None, refresh_per_second=_REFRESH_RATE, transient=False) as live:
-                live.update(make_panel())
+                def _sync_update(renderable=None):
+                    if renderable is None:
+                        renderable = make_panel()
+                    sys.stdout.write("\033[?2026h")
+                    live.update(renderable)
+                    sys.stdout.write("\033[?2026l")
+                _sync_update()
                 while True:
                     key = read_key()
-
+                    
                     # ── Input mode (jump-to-episode) ───────────
                     if _input_active:
                         if key == KEY_ENTER:
@@ -1155,7 +1171,7 @@ def interactive_checklist(options, title="Select Episodes", default_start_idx=0,
                             _input_buf = _input_buf[:-1]
                         elif isinstance(key, str) and key.isdigit():
                             _input_buf += key
-                        live.update(make_panel())
+                        _sync_update()
                         continue
 
                     now = time.time()
@@ -1182,19 +1198,19 @@ def interactive_checklist(options, title="Select Episodes", default_start_idx=0,
                     elif key in ('d', 'D'):
                         if context_type:
                             _show_details = not _show_details
-                            live.update(make_panel())
+                            _sync_update()
                     elif key == KEY_SPACE:
                         checked[selected_idx] = not checked[selected_idx]
                         _last_drag_time = now
-                        live.update(make_panel())
+                        _sync_update()
                     elif key == KEY_A:
                         all_checked = all(checked)
                         checked = [not all_checked] * len(options)
-                        live.update(make_panel())
+                        _sync_update()
                     elif key in ('f', 'F'):
                         if on_toggle_favorite:
                             is_favorite = on_toggle_favorite()
-                            live.update(make_panel())
+                            _sync_update()
                     elif key == '[':
                         _anim_old_scroll = scroll_offset
                         _anim_start = time.monotonic()
@@ -1216,7 +1232,7 @@ def interactive_checklist(options, title="Select Episodes", default_start_idx=0,
                     elif key in ('j', 'J'):
                         _input_active = True
                         _input_buf = ""
-                        live.update(make_panel())
+                        _sync_update()
                     elif key in ('?', 'h', 'H'):
                         _show_help_panel([
                             ("\u2191 / \u2193", "Navigate list"),
@@ -1229,8 +1245,8 @@ def interactive_checklist(options, title="Select Episodes", default_start_idx=0,
                             ("g / G", "Go to first / last"),
                             ("Enter", "Scrape & play selected"),
                             ("Esc", "Go back"),
-                        ], "Episode Selection Help")
-                        live.update(make_panel())
+                        ], "Episode Selection Help", live=live)
+                        _sync_update()
                     elif key == KEY_ENTER:
                         return [idx for idx, val in enumerate(checked) if val]
                     elif key in (KEY_ESC, KEY_CTRL_C):
@@ -2004,7 +2020,7 @@ def _handle_episode_selection(current, stack, ctx):
             empty = 10 - filled
             bar_str = f" [dim {THEME['dim']}][[/dim {THEME['dim']}]{'█' * filled}{'░' * empty}[dim {THEME['dim']}]][/dim {THEME['dim']}] [bold {THEME['accent']}]{int(pct * 100)}%[/bold {THEME['accent']}]"
         if ep_num in watched_list:
-            ep_options.append(f"Episode {ep_num}{bar_str} [dim {THEME['dim']}](watched {get_icon('check').strip()})[/dim {THEME['dim']}]")
+            ep_options.append(f"Episode {ep_num}{bar_str} [dim {THEME['dim']}](watched ✓)[/dim {THEME['dim']}]")
         else:
             ep_options.append(f"Episode {ep_num}{bar_str}")
     fav_status = is_favorite_slug(slug)

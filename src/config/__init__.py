@@ -252,11 +252,11 @@ def get_icon(name):
         "search": "⚲ ",
         "favorite_on": "★ ",
         "favorite_off": "☆ ",
-        "direct_url": "🔗 ",
+        "direct_url": "↗ ",
         "settings": "⚙ ",
         "exit": "⏻ ",
         "play": "▶ ",
-        "watch_history": "⏳ ",
+        "watch_history": "↻ ",
         "check": "✔ ",
         "cross": "✘ ",
         "warning": "⚠ ",
@@ -264,7 +264,7 @@ def get_icon(name):
         "bullet": "❯ ",
         "arrow_up": "▲ ",
         "arrow_down": "▼ ",
-        "folder": "📁 ",
+        "folder": "▣ ",
         "download": "⬇ ",
         "sparkle": "✦ "
     }

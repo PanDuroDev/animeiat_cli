@@ -103,7 +103,10 @@ No Python installation required for prebuilt binaries. Just download, extract, a
 5. **Run:**
 
    ```bash
-   python anime_cli.py
+   animeiat-cli
+
+   # Or via Python module:
+   python -m src.ui.cli
    ```
 
    Use `python3` on macOS/Linux if `python` is not found.
@@ -325,7 +328,6 @@ Available keys:
 
 ```
 animeiat-cli/
-├── anime_cli.py              # Entry point — auto-installs deps, delegates to src/
 ├── build/
 │   ├── build.py              # Build script (PyInstaller wrapper, one command)
 │   └── animeiat-cli.spec     # PyInstaller spec file
@@ -333,14 +335,18 @@ animeiat-cli/
 │   └── workflows/
 │       └── build.yml         # CI/CD: auto-builds Windows, macOS, Linux
 ├── src/
+│   ├── __init__.py
 │   ├── chromium.py           # Chromium auto-install helper
 │   ├── ui/
 │   │   ├── __init__.py       # UI exports
-│   │   ├── tui.py            # Interactive TUI (Rich-based, ~2400 lines)
-│   │   └── cli.py            # CLI argument parsing and routing
+│   │   ├── tui.py            # Interactive TUI (Rich-based, ~2450 lines)
+│   │   └── cli.py            # CLI entry point & argument parsing
 │   ├── providers/
 │   │   ├── __init__.py       # Provider registry
-│   │   ├── witanime.py       # Witanime provider
+│   │   ├── _cookies.py       # Browser cookie extraction
+│   │   ├── _utils.py         # Shared helpers (URL validation, quality classification)
+│   │   ├── _scraper.py       # Shared scraping logic (httpx + Playwright)
+│   │   ├── witanime.py       # WitAnime provider
 │   │   ├── anineko.py        # Anineko provider
 │   │   └── anime3rb.py       # Anime3rb provider
 │   ├── playback/
@@ -355,10 +361,6 @@ animeiat-cli/
 │   │   └── __init__.py       # Config read/write, theme, icons
 │   └── db/
 │       └── __init__.py       # SQLite DB: accounts, favorites, history, downloads
-├── scraping.py               # Legacy scraper (deprecated — uses src/providers)
-├── config.py                 # Legacy re-export (deprecated → src/config)
-├── db.py                     # Legacy re-export (deprecated → src/db)
-├── player.py                 # Legacy re-export (deprecated → src/playback)
 ├── requirements.txt          # Python package dependencies
 ├── pyproject.toml            # Project metadata (PEP 621)
 ├── setup.py                  # Legacy Cython build (deprecated — use build/build.py)

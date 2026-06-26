@@ -816,9 +816,9 @@ async def scrape_one_stream_async(browser, ep_item, is_witanime, active_cookies,
     if resolved_stream:
         results_dict[ep_num] = resolved_stream
         quality = "FHD/1080p" if any(q in resolved_stream.lower() for q in ["1080p", "fhd", "w1080p"]) else "HD/720p" if any(q in resolved_stream.lower() for q in ["720p", "hd"]) else "SD/480p" if "480p" in resolved_stream.lower() else "Auto"
-        status_dict[ep_num] = {"status": "Resolved ✔", "color": "green", "quality": quality}
+        status_dict[ep_num] = {"status": f"Resolved {get_icon('check').strip()}", "color": "green", "quality": quality}
     else:
-        status_dict[ep_num] = {"status": "Failed ✘", "color": "red", "quality": "-"}
+        status_dict[ep_num] = {"status": f"Failed {get_icon('cross').strip()}", "color": "red", "quality": "-"}
 
 
 async def scrape_multiple_streams_async(ep_items, is_witanime, active_cookies):
@@ -892,7 +892,7 @@ async def scrape_multiple_streams_async(ep_items, is_witanime, active_cookies):
             if stream:
                 results[en] = stream
                 quality = "FHD/1080p" if any(q in stream.lower() for q in ["1080p", "fhd", "w1080p"]) else "HD/720p" if any(q in stream.lower() for q in ["720p", "hd"]) else "SD/480p" if "480p" in stream.lower() else "Auto"
-                status_dict[en] = {"status": "Resolved ✔", "color": "green", "quality": quality}
+                status_dict[en] = {"status": f"Resolved {get_icon('check').strip()}", "color": "green", "quality": quality}
             else:
                 need_playwright.append(ep)
                 status_dict[en] = {"status": "Pending...", "color": "gray", "quality": "-"}
@@ -900,7 +900,7 @@ async def scrape_multiple_streams_async(ep_items, is_witanime, active_cookies):
     if need_playwright:
         if method == "alternative_only":
             for ep in need_playwright:
-                status_dict[ep["episode"]] = {"status": "Failed ✘", "color": "red", "quality": "-"}
+                status_dict[ep["episode"]] = {"status": f"Failed {get_icon('cross').strip()}", "color": "red", "quality": "-"}
         else:
             try:
                 async with async_playwright() as p:

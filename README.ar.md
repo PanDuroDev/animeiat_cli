@@ -105,7 +105,10 @@ animeiat-cli هو برنامج يعمل في الطرفية (Terminal) الخا�
 5. **شغّل التطبيق:**
 
    ```bash
-   python anime_cli.py
+   animeiat-cli
+
+   # أو عبر وحدة Python:
+   python -m src.ui.cli
    ```
 
    استخدم `python3` على macOS و Linux إذا لم يعمل `python`.
@@ -327,7 +330,6 @@ git push origin v1.0.0
 
 ```
 animeiat-cli/
-├── anime_cli.py              # نقطة الدخول — تُثبّت التبعيات تلقائيًا، تُمرّر المهام إلى src/
 ├── build/
 │   ├── build.py              # نص البناء (PyInstaller، أمر واحد)
 │   └── animeiat-cli.spec     # ملف مواصفات PyInstaller
@@ -335,14 +337,18 @@ animeiat-cli/
 │   └── workflows/
 │       └── build.yml         # CI/CD: بناء Windows, macOS, Linux تلقائيًا
 ├── src/
+│   ├── __init__.py
 │   ├── chromium.py           # أداة تحميل Chromium تلقائي
 │   ├── ui/
 │   │   ├── __init__.py       # تصديرات واجهة المستخدم
-│   │   ├── tui.py            # الواجهة التفاعلية (Rich، ~2400 سطر)
-│   │   └── cli.py            # تحليل وسائط سطر الأوامر والتوجيه
+│   │   ├── tui.py            # الواجهة التفاعلية (Rich، ~2450 سطر)
+│   │   └── cli.py            # نقطة الدخول وتحليل وسائط سطر الأوامر
 │   ├── providers/
 │   │   ├── __init__.py       # سجل المزوّدين
-│   │   ├── witanime.py       # مزود Witanime
+│   │   ├── _cookies.py       # استخراج الكوكيز من المتصفح
+│   │   ├── _utils.py         # أدوات مساعدة مشتركة (التحقق من الروابط، تصنيف الجودة)
+│   │   ├── _scraper.py       # منطق الاستخراج المشترك (httpx + Playwright)
+│   │   ├── witanime.py       # مزود WitAnime
 │   │   ├── anineko.py        # مزود Anineko
 │   │   └── anime3rb.py       # مزود Anime3rb
 │   ├── playback/
@@ -357,10 +363,6 @@ animeiat-cli/
 │   │   └── __init__.py       # إعدادات، سمات، أيقونات
 │   └── db/
 │       └── __init__.py       # قاعدة البيانات: حسابات، مفضلة، سجل، تحميلات
-├── scraping.py               # مستخرج قديم (مهمل — يستخدم src/providers)
-├── config.py                 # إعادة تصدير قديمة (مهملة → src/config)
-├── db.py                     # إعادة تصدير قديمة (مهملة → src/db)
-├── player.py                 # إعادة تصدير قديمة (مهملة → src/playback)
 ├── requirements.txt          # تبعيات Python
 ├── pyproject.toml            # بيانات المشروع (PEP 621)
 ├── setup.py                  # بناء Cython قديم (مهمل — استخدم build/build.py)

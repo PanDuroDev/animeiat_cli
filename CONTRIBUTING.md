@@ -27,7 +27,7 @@ playwright install chromium
 ## Before submitting a PR
 
 1. Ensure all tests pass: `pytest tests/ -v`
-2. Run `python anime_cli.py --help` and verify no ImportError.
+2. Run `animeiat-cli --help` (or `python -m src.ui.cli --help`) and verify no ImportError.
 3. Keep the scope focused — one feature/fix per PR.
 
 ## Reporting issues
