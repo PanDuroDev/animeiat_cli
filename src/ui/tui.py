@@ -1022,6 +1022,114 @@ def interactive_select(options, title="Select Option", context_type=None, metada
             sys.stdout.flush()
 
 
+def interactive_priority_list(labels, current_order):
+    if not labels:
+        return None
+
+    flush_input_buffer()
+    selected_idx = 0
+    scroll_offset = 0
+    _, term_height = shutil.get_terminal_size()
+    max_visible = max(5, min(20, term_height - 12))
+
+    _notify = ""
+    order = list(current_order)
+
+    if sys.stdout.isatty():
+        sys.stdout.write("\033[?25l")
+        sys.stdout.flush()
+
+    try:
+        def make_panel():
+            nonlocal scroll_offset, _notify
+            if selected_idx < scroll_offset:
+                scroll_offset = selected_idx
+            elif selected_idx >= scroll_offset + max_visible:
+                scroll_offset = selected_idx - max_visible + 1
+
+            table = Table(box=None, show_header=False, pad_edge=False, padding=(0, 1))
+
+            if scroll_offset > 0:
+                table.add_row(f"[dim {THEME['dim']}]  {get_icon('arrow_up')}more above[/dim {THEME['dim']}]")
+            else:
+                table.add_row("")
+
+            visible = order[scroll_offset : scroll_offset + max_visible]
+            for idx_rel, pid in enumerate(visible):
+                idx_abs = scroll_offset + idx_rel
+                label = labels[pid]
+                rank = order.index(pid) + 1
+                arrow = " \u25b2\u25bc" if idx_abs == selected_idx else ""
+                text = f"[{rank}] {label}{arrow}"
+
+                if idx_abs == selected_idx:
+                    table.add_row(f"[bold {THEME['primary']}]{get_icon('bullet')}[/bold {THEME['primary']}] [bold {THEME['select_fg']} on {THEME['select_bg']}]{text}[/bold {THEME['select_fg']} on {THEME['select_bg']}]")
+                else:
+                    table.add_row(f"  [{THEME['fg']}]{text}[/{THEME['fg']}]")
+
+            if scroll_offset + max_visible < len(order):
+                table.add_row(f"[dim {THEME['dim']}]  {get_icon('arrow_down')}more below[/dim {THEME['dim']}]")
+            else:
+                table.add_row("")
+
+            if _notify:
+                table.add_row(f"[bold {THEME['warning']}]  {_notify}[/bold {THEME['warning']}]")
+                _notify = ""
+            table.add_row("")
+
+            subtitle = f"\u2191\u2195 Navigate  u=Up(d) d=Down priority  \u23ce Confirm  Esc Cancel"
+
+            left_panel = Panel(
+                table,
+                title=f"[bold {THEME['primary']}] Search Source Priorities [/bold {THEME['primary']}]",
+                subtitle=f"[{THEME['fg']}]{subtitle}  ({selected_idx + 1}/{len(order)})[/{THEME['fg']}]",
+                border_style=THEME['border'],
+                box=rich_box.ROUNDED,
+                expand=True,
+                padding=(1, 2)
+            )
+
+            renderable = Group(left_panel)
+            return renderable
+
+        live = Live(
+            make_panel(),
+            screen=True,
+            auto_refresh=False,
+            vertical_overflow="visible",
+        )
+        with live:
+            while True:
+                live.update(make_panel())
+                key = read_key()
+                if key in ("q", "escape"):
+                    return None
+                elif key == "enter":
+                    return order
+                elif key == "up":
+                    selected_idx = max(0, selected_idx - 1)
+                elif key == "down":
+                    selected_idx = min(len(order) - 1, selected_idx + 1)
+                elif key in ("u", "U"):
+                    if selected_idx > 0:
+                        order[selected_idx], order[selected_idx - 1] = order[selected_idx - 1], order[selected_idx]
+                        selected_idx -= 1
+                        _notify = f"Moved {labels[order[selected_idx]]} up"
+                    else:
+                        _notify = "Already at top"
+                elif key in ("d", "D"):
+                    if selected_idx < len(order) - 1:
+                        order[selected_idx], order[selected_idx + 1] = order[selected_idx + 1], order[selected_idx]
+                        selected_idx += 1
+                        _notify = f"Moved {labels[order[selected_idx]]} down"
+                    else:
+                        _notify = "Already at bottom"
+    finally:
+        if sys.stdout.isatty():
+            sys.stdout.write("\033[?25h")
+            sys.stdout.flush()
+
+
 def interactive_checklist(options, title="Select Episodes", default_start_idx=0, is_favorite=False, on_toggle_favorite=None,
                           context_type=None, metadata=None,
                           player_name=None, active_player=None, pref_player=None, icons=None,
@@ -1377,14 +1485,14 @@ def _handle_search_input(current, stack, ctx):
         stack.pop()
         return True
     add_search_history(query)
-    enabled = [i for i in cfg.get("enabled_sources", [0, 1]) if i <= 1]
-    active_providers = [p for p in provider_registry.get_all() if p.provider_id in enabled]
+    priorities = cfg.get("search_priorities", [0, 1, 2])
+    active_providers = [p for p in provider_registry.get_all() if p.provider_id in priorities]
     source_names = [p.provider_name for p in active_providers]
     with _centered_status(f"Searching {', '.join(source_names)}...", icon="search"):
         try:
             from src.providers import search_all_providers as _search_all
             from src.config import PROVIDER_IDS as _PID
-            raw = _run_async(_search_all(query, enabled))
+            raw = _run_async(_search_all(query, priorities=priorities))
             search_results = []
             seen = set()
             for pid, items in raw.items():
@@ -1534,10 +1642,10 @@ def _handle_url_input(current, stack, ctx):
             with _centered_status("Searching...", icon="search"):
                 try:
                     cfg_s = load_config()
-                    enabled = [i for i in cfg_s.get("enabled_sources", [0, 1]) if i <= 1]
+                    priorities = cfg_s.get("search_priorities", [0, 1, 2])
                     from src.providers import search_all_providers as _search_all
                     from src.config import PROVIDER_IDS as _PID
-                    raw = _run_async(_search_all(search_query, enabled))
+                    raw = _run_async(_search_all(search_query, priorities=priorities))
                     search_results = []
                     seen = set()
                     for pid, items in raw.items():
@@ -1772,11 +1880,11 @@ def _settings_player(cfg, ctx):
 def _settings_search_sources(cfg):
     while True:
         scrap_method = cfg.get("scraping_method", "auto")
-        enabled = [i for i in cfg.get("enabled_sources", [0, 1]) if i <= 1]
+        priorities = cfg.get("search_priorities", [0, 1, 2])
         method_labels = {"auto": "Auto (httpx -> Playwright)", "playwright_only": "Playwright Only", "alternative_only": "httpx Only"}
         opts = [
-            f"Search Sources         (Current: {len(enabled)}/2 enabled)",
-            f"Scraping Method        (Current: {scrap_method.upper()})",
+            f"Search Source Priorities   (Current: {len(priorities)} providers)",
+            f"Scraping Method            (Current: {scrap_method.upper()})",
             "Clear Search History",
             "Go Back"
         ]
@@ -1784,18 +1892,18 @@ def _settings_search_sources(cfg):
         if sel_idx == -1 or sel_idx == 3:
             break
         if sel_idx == 0:
-            provider_options = [
-                "[0] Anime3rb", "[1] WitAnime",
-            ]
-            current_enabled = [i for i in cfg.get("enabled_sources", [0, 1]) if i <= 1]
-            selected = interactive_checklist(
-                provider_options, "Toggle Search Sources (space to toggle, Enter to confirm)",
-                preselected_indices=current_enabled
+            provider_options = ["Anime3rb (0)", "WitAnime (1)", "Anineko (2)"]
+            old_priorities = cfg.get("search_priorities", [0, 1, 2])
+            current_order = [p for p in old_priorities if p in [0, 1, 2]]
+            missing = [p for p in [0, 1, 2] if p not in current_order]
+            new_priorities = current_order + missing
+            selected = interactive_priority_list(
+                provider_options, new_priorities,
             )
             if selected is not None:
-                cfg["enabled_sources"] = selected
+                cfg["search_priorities"] = selected
                 save_config(cfg)
-                _centered_message(f"Search sources updated ({len(selected)}/2 enabled)!", "info")
+                _centered_message(f"Search priorities updated", "info")
         elif sel_idx == 1:
             methods = ["auto", "playwright_only", "alternative_only"]
             m_labels = {"auto": "Auto (httpx -> Playwright)", "playwright_only": "Playwright Only", "alternative_only": "httpx Only"}

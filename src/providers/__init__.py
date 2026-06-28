@@ -135,10 +135,17 @@ def search_providers_for_media(title):
 async def search_all_providers(
     query: str,
     provider_ids: list[int] | None = None,
+    priorities: list[int] | None = None,
 ) -> dict[int, list[dict[str, Any]]]:
     providers = registry.get_all()
     if provider_ids is not None:
         providers = [p for p in providers if p.provider_id in provider_ids]
+
+    if priorities is not None:
+        id_order = {pid: i for i, pid in enumerate(priorities)}
+        providers.sort(key=lambda p: id_order.get(p.provider_id, 999))
+    elif provider_ids is not None:
+        providers.sort(key=lambda p: provider_ids.index(p.provider_id) if p.provider_id in provider_ids else 999)
 
     if not providers:
         return {}

@@ -178,7 +178,7 @@ def load_config():
         "custom_player_args": "",
         "nerd_fonts": False,
         "scraping_method": "auto",
-        "enabled_sources": [0, 1],
+        "search_priorities": [0, 1, 2],
         "search_history": [],
         "download_dir": "",
         "favorites": [],
@@ -191,6 +191,9 @@ def load_config():
     try:
         with open(p, "r", encoding="utf-8") as f:
             cfg = json.load(f)
+            if "enabled_sources" in cfg and "search_priorities" not in cfg:
+                old = cfg.pop("enabled_sources")
+                cfg["search_priorities"] = [p for p in [0, 1, 2] if p in old]
             for k, v in default_cfg.items():
                 if k not in cfg:
                     cfg[k] = v
