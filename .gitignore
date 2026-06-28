@@ -79,6 +79,7 @@ logs/
 
 # ── PyInstaller build artifacts ──
 *.manifest
+build/dist/
 
 # ── Project-specific ──
 *.db
