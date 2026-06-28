@@ -241,7 +241,7 @@ def _cmd_check():
 
     print()
     print(f"  Spec file:   {os.path.relpath(SPEC_FILE, PROJECT_ROOT)}")
-    print(f"  Entry point: anime_cli.py")
+    print(f"  Entry point: src/ui/cli.py")
     print(f"  Output:      dist/")
 
     cwd_size = _fmt_size(

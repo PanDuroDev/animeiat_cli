@@ -12,3 +12,6 @@ pycryptodome>=3.15.0
 
 # Optional: keyring for macOS/Linux cookie key fallback
 keyring>=23.0.0
+
+# Windows: Chrome cookie decryption (win32crypt)
+pywin32>=300; sys_platform == 'win32'

@@ -4,10 +4,13 @@ TUI components for animeiat-cli — interactive terminal UI, state machine, and 
 import asyncio
 import sqlite3
 
-_shared_loop = asyncio.new_event_loop()
-asyncio.set_event_loop(_shared_loop)
+_shared_loop = None
 
 def _run_async(coro):
+    global _shared_loop
+    if _shared_loop is None:
+        _shared_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(_shared_loop)
     return _shared_loop.run_until_complete(coro)
 
 import atexit
@@ -1274,15 +1277,11 @@ def _handle_main_menu(current, stack, ctx):
         f"{get_icon('settings')}Settings / Configuration",
         f"{get_icon('exit')}Exit"
     ]
-    fav_count = 0
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM favorites")
-        fav_count = cursor.fetchone()[0]
-        conn.close()
+        fav_count = len(get_all_favorites())
     except sqlite3.Error as e:
         print(f"[animeiat-cli] Warning: favorites count DB query failed: {e}")
+        fav_count = 0
     update_info = check_for_update(APP_VERSION)
     menu_metadata = {
         "pref_player": ctx["cfg"].get("preferred_player", "auto"),
