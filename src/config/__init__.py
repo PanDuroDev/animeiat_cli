@@ -180,6 +180,7 @@ def load_config():
         "scraping_method": "auto",
         "enabled_sources": [0, 1],
         "search_history": [],
+        "download_dir": "",
         "favorites": [],
         "history": {}
     }

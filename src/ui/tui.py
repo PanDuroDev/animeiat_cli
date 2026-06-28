@@ -47,6 +47,7 @@ from src.db import (
     get_all_episode_progress,
     add_download_entry, get_downloads, remove_download_entry, update_download_status,
 )
+from src.downloader import enqueue_selected
 from src.cache import cache_stream_url, get_cached_stream_url
 from src.playback.discovery import (
     get_cached_players, clear_player_cache,
@@ -2146,12 +2147,8 @@ def _handle_episode_selection(current, stack, ctx):
             if result is not None:
                 track_info = result
         elif key in ('d', 'D'):
-            for ep in eps_to_scrape:
-                ep_num = ep["episode"]
-                u_str = cached_urls.get(ep_num)
-                if u_str:
-                    add_download_entry(slug, ep_num, u_str)
-            _centered_message(f"{len(eps_to_scrape)} episode(s) queued for download.\nAccess 'Download Manager' in Settings to manage.", level="ok")
+            queued = enqueue_selected(eps_to_scrape, cached_urls, slug)
+            _centered_message(f"{queued} episode(s) queued for download.\nCheck 'Download Manager' in the menu for progress.", level="ok")
             return True
         elif key in (KEY_ESC, KEY_CTRL_C):
             return True
@@ -2257,32 +2254,68 @@ def _handle_export():
 
 
 def _handle_download_manager(current, stack, ctx):
+    from src.downloader import start_download, get_download_dir
     downloads = get_downloads()
     if not downloads:
-        _centered_message("No downloads queued yet. Select episodes and choose 'Download' to add them.", level="warn")
+        _centered_message("No downloads queued yet. Select episodes and choose 'D' to add them.", level="warn")
         stack.pop()
         return True
 
+    status_emoji = {
+        "completed": get_icon("check"),
+        "downloading": get_icon("watch_history"),
+        "pending": " ",
+        "failed": get_icon("cross"),
+    }
+
     options = []
     for d in downloads:
-        status_icon = get_icon("check") if d["status"] == "completed" else (get_icon("watch_history") if d["status"] == "downloading" else get_icon("cross"))
-        options.append(f"Ep {d['episode']} ({d['slug']}) [{status_icon} {d['status']}]")
+        icon = status_emoji.get(d["status"], get_icon("cross"))
+        label = d["status"]
+        if d["status"] == "completed":
+            fname = os.path.basename(d.get("file_path", "")) if d.get("file_path") else ""
+            label = f"done {fname}" if fname else "done"
+        options.append(f"Ep {d['episode']} ({d['slug']}) [{icon} {label}]")
 
-    idx, opt = interactive_select(options, "Download Manager")
+    idx, opt = interactive_select(options, "Download Manager (select to manage)")
     if idx == -1:
         stack.pop()
         return True
 
     selected = downloads[idx]
     if selected["status"] == "completed":
-        _centered_message(f"Already downloaded: {selected.get('file_path', 'unknown')}\nStream URL: {selected['stream_url']}", level="info")
+        fp = selected.get("file_path", "")
+        _centered_message(
+            f"Downloaded: {fp if fp else 'location unknown'}\nURL: {selected['stream_url']}",
+            level="info"
+        )
+    elif selected["status"] == "failed":
+        _centered_message(
+            f"Episode {selected['episode']} — Download failed.\nURL: {selected['stream_url']}",
+            level="error"
+        )
+        retry = _centered_prompt("Retry download? (y/N)")
+        if retry and retry.lower() == 'y':
+            start_download(selected["slug"], selected["episode"], selected["stream_url"], selected.get("quality", ""))
+            _centered_message("Re-queued for download.", level="info")
+    elif selected["status"] == "downloading":
+        _centered_message(f"Still downloading episode {selected['episode']}...", level="info")
     else:
-        _centered_message(f"Episode {selected['episode']} \u2014 Status: {selected['status']}\nStream URL: {selected['stream_url']}", level="info")
-        remove = _centered_prompt("Remove this download entry? (y/N)")
-        if remove and remove.lower() == 'y':
-            remove_download_entry(selected["slug"], selected["episode"])
+        _centered_message(
+            f"Episode {selected['episode']} — Status: {selected['status']}\nURL: {selected['stream_url']}",
+            level="info"
+        )
+        start_now = _centered_prompt("Start download now? (y/N)")
+        if start_now and start_now.lower() == 'y':
+            start_download(selected["slug"], selected["episode"], selected["stream_url"], selected.get("quality", ""))
+            _centered_message("Download started.", level="info")
 
-    _centered_message("Done.", level="info")
+    remove = _centered_prompt("Remove this entry? (y/N)")
+    if remove and remove.lower() == 'y':
+        remove_download_entry(selected["slug"], selected["episode"])
+        _centered_message("Entry removed.", level="info")
+
+    _centered_message(f"Downloads folder: {get_download_dir()}", level="info")
     return True
 
 

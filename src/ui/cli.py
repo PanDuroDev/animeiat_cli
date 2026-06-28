@@ -18,6 +18,7 @@ from src.db import (
     get_db_path, init_db, migrate_json_to_sqlite,
     add_watch_history, add_download_entry,
 )
+from src.downloader import download_and_wait
 from src.cache import get_cached_stream_url
 from src.playback.discovery import (
     get_cached_players,
@@ -110,12 +111,20 @@ def run_noninteractive(initial_url, player_override=None, quality_override=None,
         _emit({"error": "No stream URLs resolved.", "success": False}, exit_code=1)
 
     if download_mode:
+        queued = 0
         for ep in eps_to_scrape:
             ep_num = ep["episode"]
             u_str = results.get(ep_num)
             if u_str:
-                add_download_entry(slug, ep_num, u_str)
-        _emit({"slug": slug, "queued": len(stream_urls), "mode": "download", "success": True}, exit_code=0)
+                add_download_entry(slug, ep_num, u_str, quality=quality_override or "")
+                print(f"  Downloading episode {ep_num}...")
+                ok = download_and_wait(slug, ep_num, u_str, quality=quality_override or "")
+                if ok:
+                    queued += 1
+                    print(f"  Episode {ep_num} downloaded.")
+                else:
+                    print(f"  Episode {ep_num} download failed.")
+        _emit({"slug": slug, "queued": queued, "mode": "download", "success": queued > 0}, exit_code=0 if queued > 0 else 1)
 
     if json_output:
         _emit({"slug": slug, "episode": eps[0]["episode"], "stream_urls": stream_urls, "success": True, "mode": "stream"}, exit_code=0)
