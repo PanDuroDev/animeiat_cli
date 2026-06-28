@@ -165,6 +165,7 @@ def migrate_json_to_sqlite():
     p = get_config_path()
     if not os.path.exists(p):
         return
+    conn = None
     try:
         with open(p, "r", encoding="utf-8") as f:
             cfg = json.load(f)
@@ -207,26 +208,33 @@ def migrate_json_to_sqlite():
             conn.commit()
             with open(p, "w", encoding="utf-8") as f:
                 json.dump(cfg, f, ensure_ascii=False, indent=4)
-        conn.close()
     except Exception as e:
         print(f"[animeiat-cli] Warning: config migration failed: {e}")
+    finally:
+        if conn:
+            conn.close()
 
 
 def save_episode_progress(slug, ep, time_pos, duration, provider=0):
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            "INSERT OR REPLACE INTO episode_progress (slug, episode, time_pos, duration, provider) VALUES (?, ?, ?, ?, ?)",
-            (slug, ep, time_pos, duration, provider)
-        )
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        print(f"[animeiat-cli] Warning: save_episode_progress failed: {e}")
+    with _db_write_lock:
+        conn = None
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT OR REPLACE INTO episode_progress (slug, episode, time_pos, duration, provider) VALUES (?, ?, ?, ?, ?)",
+                (slug, ep, time_pos, duration, provider)
+            )
+            conn.commit()
+        except Exception as e:
+            print(f"[animeiat-cli] Warning: save_episode_progress failed: {e}")
+        finally:
+            if conn:
+                conn.close()
 
 
 def get_episode_progress(slug, ep, provider=0):
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -235,51 +243,61 @@ def get_episode_progress(slug, ep, provider=0):
             (slug, ep, provider)
         )
         row = cursor.fetchone()
-        conn.close()
         if row:
             return {"time_pos": row[0], "duration": row[1]}
     except Exception as e:
         print(f"[animeiat-cli] Warning: get_episode_progress failed: {e}")
+    finally:
+        if conn:
+            conn.close()
     return None
 
 
 def toggle_favorite_state(title, url, is_witanime, slug):
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT 1 FROM favorites WHERE slug = ?", (slug,))
-        exists = cursor.fetchone() is not None
-        if exists:
-            cursor.execute("DELETE FROM favorites WHERE slug = ?", (slug,))
-            ret = False
-        else:
-            cursor.execute(
-                "INSERT INTO favorites (slug, title, url, is_witanime) VALUES (?, ?, ?, ?)",
-                (slug, title, url, int(is_witanime))
-            )
-            ret = True
-        conn.commit()
-        conn.close()
-        return ret
-    except Exception as e:
-        print(f"[animeiat-cli] Warning: toggle_favorite_state failed: {e}")
-        return False
+    with _db_write_lock:
+        conn = None
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT 1 FROM favorites WHERE slug = ?", (slug,))
+            exists = cursor.fetchone() is not None
+            if exists:
+                cursor.execute("DELETE FROM favorites WHERE slug = ?", (slug,))
+                ret = False
+            else:
+                cursor.execute(
+                    "INSERT INTO favorites (slug, title, url, is_witanime) VALUES (?, ?, ?, ?)",
+                    (slug, title, url, int(is_witanime))
+                )
+                ret = True
+            conn.commit()
+            return ret
+        except Exception as e:
+            print(f"[animeiat-cli] Warning: toggle_favorite_state failed: {e}")
+            return False
+        finally:
+            if conn:
+                conn.close()
 
 
 def is_favorite_slug(slug):
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT 1 FROM favorites WHERE slug = ?", (slug,))
         exists = cursor.fetchone() is not None
-        conn.close()
         return exists
     except Exception as e:
         print(f"[animeiat-cli] Warning: is_favorite_slug failed: {e}")
         return False
+    finally:
+        if conn:
+            conn.close()
 
 
 def get_all_episode_progress(slug, provider=0):
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -288,30 +306,37 @@ def get_all_episode_progress(slug, provider=0):
             (slug, provider)
         )
         rows = cursor.fetchall()
-        conn.close()
         return {r[0]: {"time_pos": r[1], "duration": r[2]} for r in rows}
     except Exception as e:
         print(f"[animeiat-cli] Warning: get_all_episode_progress failed: {e}")
         return {}
+    finally:
+        if conn:
+            conn.close()
 
 
 def add_download_entry(slug, episode, stream_url, quality=""):
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            "INSERT OR REPLACE INTO downloads (slug, episode, stream_url, quality, status, added_at) VALUES (?, ?, ?, ?, 'pending', ?)",
-            (slug, episode, stream_url, quality, time.time())
-        )
-        conn.commit()
-        conn.close()
-        return True
-    except Exception as e:
-        print(f"[animeiat-cli] Warning: add_download_entry failed: {e}")
-        return False
+    with _db_write_lock:
+        conn = None
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT OR REPLACE INTO downloads (slug, episode, stream_url, quality, status, added_at) VALUES (?, ?, ?, ?, 'pending', ?)",
+                (slug, episode, stream_url, quality, time.time())
+            )
+            conn.commit()
+            return True
+        except Exception as e:
+            print(f"[animeiat-cli] Warning: add_download_entry failed: {e}")
+            return False
+        finally:
+            if conn:
+                conn.close()
 
 
 def get_downloads(slug=None):
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -325,7 +350,6 @@ def get_downloads(slug=None):
                 "SELECT slug, episode, stream_url, quality, status, file_path, added_at, downloaded_at FROM downloads ORDER BY added_at DESC"
             )
         rows = cursor.fetchall()
-        conn.close()
         return [
             {
                 "slug": r[0], "episode": r[1], "stream_url": r[2],
@@ -337,35 +361,46 @@ def get_downloads(slug=None):
     except Exception as e:
         print(f"[animeiat-cli] Warning: get_downloads failed: {e}")
         return []
+    finally:
+        if conn:
+            conn.close()
 
 
 def remove_download_entry(slug, episode):
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM downloads WHERE slug = ? AND episode = ?", (slug, episode))
-        conn.commit()
-        conn.close()
-        return True
-    except Exception as e:
-        print(f"[animeiat-cli] Warning: remove_download_entry failed: {e}")
-        return False
+    with _db_write_lock:
+        conn = None
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM downloads WHERE slug = ? AND episode = ?", (slug, episode))
+            conn.commit()
+            return True
+        except Exception as e:
+            print(f"[animeiat-cli] Warning: remove_download_entry failed: {e}")
+            return False
+        finally:
+            if conn:
+                conn.close()
 
 
 def update_download_status(slug, episode, status, file_path=""):
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            "UPDATE downloads SET status = ?, file_path = ?, downloaded_at = ? WHERE slug = ? AND episode = ?",
-            (status, file_path, time.time() if status == "completed" else None, slug, episode)
-        )
-        conn.commit()
-        conn.close()
-        return True
-    except Exception as e:
-        print(f"[animeiat-cli] Warning: update_download_status failed: {e}")
-        return False
+    with _db_write_lock:
+        conn = None
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE downloads SET status = ?, file_path = ?, downloaded_at = ? WHERE slug = ? AND episode = ?",
+                (status, file_path, time.time() if status == "completed" else None, slug, episode)
+            )
+            conn.commit()
+            return True
+        except Exception as e:
+            print(f"[animeiat-cli] Warning: update_download_status failed: {e}")
+            return False
+        finally:
+            if conn:
+                conn.close()
 
 
 def add_watch_history(slug, episode_num, anime_title=None, provider=0):
@@ -373,21 +408,26 @@ def add_watch_history(slug, episode_num, anime_title=None, provider=0):
     if not cfg.get("history_tracking", True):
         return
     slug_key = f"{slug}_{provider}"
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("INSERT OR REPLACE INTO shows (slug, last_watched) VALUES (?, ?)", (slug_key, episode_num))
-        cursor.execute("INSERT OR IGNORE INTO watched_episodes (slug, episode) VALUES (?, ?)", (slug_key, episode_num))
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        print(f"[animeiat-cli] Warning: add_watch_history failed: {e}")
+    with _db_write_lock:
+        conn = None
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("INSERT OR REPLACE INTO shows (slug, last_watched) VALUES (?, ?)", (slug_key, episode_num))
+            cursor.execute("INSERT OR IGNORE INTO watched_episodes (slug, episode) VALUES (?, ?)", (slug_key, episode_num))
+            conn.commit()
+        except Exception as e:
+            print(f"[animeiat-cli] Warning: add_watch_history failed: {e}")
+        finally:
+            if conn:
+                conn.close()
 
     sync_watch_progress_bg(slug, anime_title, episode_num)
 
 
 def get_watch_history(slug, provider=0):
     slug_key = f"{slug}_{provider}"
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -397,37 +437,43 @@ def get_watch_history(slug, provider=0):
 
         cursor.execute("SELECT episode FROM watched_episodes WHERE slug = ?", (slug_key,))
         watched = [r[0] for r in cursor.fetchall()]
-        conn.close()
         return {"last_watched": last_watched, "watched": watched}
     except Exception as e:
         print(f"[animeiat-cli] Warning: get_watch_history failed: {e}")
         return {"last_watched": 0, "watched": []}
+    finally:
+        if conn:
+            conn.close()
 
 
 def save_account_token(platform, token, client_id=None, refresh_token=None, expires_in=None):
     expires_at = time.time() + expires_in if expires_in else None
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            "INSERT OR REPLACE INTO accounts (platform, token, client_id, refresh_token, expires_at) VALUES (?, ?, ?, ?, ?)",
-            (platform, token, client_id, refresh_token, expires_at)
-        )
-        conn.commit()
-        conn.close()
-        return True
-    except Exception as e:
-        print(f"[animeiat-cli] Warning: save_account_token failed: {e}")
-        return False
+    with _db_write_lock:
+        conn = None
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT OR REPLACE INTO accounts (platform, token, client_id, refresh_token, expires_at) VALUES (?, ?, ?, ?, ?)",
+                (platform, token, client_id, refresh_token, expires_at)
+            )
+            conn.commit()
+            return True
+        except Exception as e:
+            print(f"[animeiat-cli] Warning: save_account_token failed: {e}")
+            return False
+        finally:
+            if conn:
+                conn.close()
 
 
 def get_account_token(platform):
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT token, client_id, refresh_token, expires_at FROM accounts WHERE platform = ?", (platform,))
         row = cursor.fetchone()
-        conn.close()
         if row:
             return {
                 "token": row[0],
@@ -437,20 +483,27 @@ def get_account_token(platform):
             }
     except Exception as e:
         print(f"[animeiat-cli] Warning: get_account_token failed: {e}")
+    finally:
+        if conn:
+            conn.close()
     return None
 
 
 def remove_account(platform):
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM accounts WHERE platform = ?", (platform,))
-        conn.commit()
-        conn.close()
-        return True
-    except Exception as e:
-        print(f"[animeiat-cli] Warning: remove_account failed: {e}")
-        return False
+    with _db_write_lock:
+        conn = None
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM accounts WHERE platform = ?", (platform,))
+            conn.commit()
+            return True
+        except Exception as e:
+            print(f"[animeiat-cli] Warning: remove_account failed: {e}")
+            return False
+        finally:
+            if conn:
+                conn.close()
 
 
 def refresh_mal_token(client_id, refresh_token):
