@@ -155,8 +155,8 @@ def read_key():
             ch = msvcrt.getwch()
             if ch in ('\x00', '\xe0'):
                 ch += msvcrt.getwch()
-            if ch == '\xe0H': return KEY_UP
-            if ch == '\xe0P': return KEY_DOWN
+            if ch in ('\xe0H', '\x00H'): return KEY_UP
+            if ch in ('\xe0P', '\x00P'): return KEY_DOWN
             if ch in ('\r', '\n'): return KEY_ENTER
             if ch == ' ': return KEY_SPACE
             if ch in ('\x08', '\x7f'): return '\x08'
@@ -1078,7 +1078,7 @@ def interactive_priority_list(labels, current_order):
                 _notify = ""
             table.add_row("")
 
-            subtitle = f"Navigate: \u2191\u2195  Move: u=up d=down  Confirm: Enter  Cancel: Esc"
+            subtitle = f"Nav: \u2191\u2195/jk  Move: u/d  Confirm: Enter  Cancel: Esc"
 
             panel = Panel(
                 table,
@@ -1106,9 +1106,9 @@ def interactive_priority_list(labels, current_order):
                     return None
                 elif key == "enter":
                     return order
-                elif key == "up":
+                elif key in ("up", "k", "K"):
                     selected_idx = max(0, selected_idx - 1)
-                elif key == "down":
+                elif key in ("down", "j", "J"):
                     selected_idx = min(len(order) - 1, selected_idx + 1)
                 elif key in ("u", "U"):
                     if selected_idx > 0:
