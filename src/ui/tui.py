@@ -19,6 +19,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 import time
 from urllib.parse import urlparse, quote_plus
@@ -430,9 +431,42 @@ def check_for_update(current_version):
 TRACK_DEFAULTS = {"audio_id": None, "sub_id": None, "audio_lang": None, "sub_lang": None}
 
 
-def _show_track_selector(track_info=None):
+def _probe_stream_tracks(stream_url):
+    ffprobe = shutil.which("ffprobe")
+    if not ffprobe:
+        return None
+    try:
+        result = subprocess.run(
+            [ffprobe, "-v", "quiet", "-print_format", "json",
+             "-show_streams", stream_url],
+            capture_output=True, text=True, timeout=15,
+        )
+        if result.returncode != 0:
+            return None
+        data = json.loads(result.stdout)
+        tracks = {"audio": [], "subtitle": []}
+        for s in data.get("streams", []):
+            codec_type = s.get("codec_type")
+            idx = s.get("index", 0)
+            lang = s.get("tags", {}).get("language", "und")
+            title = s.get("tags", {}).get("title", "")
+            label = f"#{idx} [{lang}] {title}" if title else f"#{idx} [{lang}]"
+            if codec_type == "audio":
+                tracks["audio"].append({"id": idx, "lang": lang, "label": label})
+            elif codec_type == "subtitle":
+                tracks["subtitle"].append({"id": idx, "lang": lang, "label": label})
+        return tracks if (tracks["audio"] or tracks["subtitle"]) else None
+    except Exception:
+        return None
+
+
+def _show_track_selector(track_info=None, stream_url=None):
     if track_info is None:
         track_info = dict(TRACK_DEFAULTS)
+
+    probed_tracks = None
+    if stream_url:
+        probed_tracks = _probe_stream_tracks(stream_url)
 
     while True:
         table = Table(box=rich_box.ROUNDED, show_header=True, header_style=f"bold {THEME['accent']}", border_style=THEME['border'])
@@ -450,11 +484,20 @@ def _show_track_selector(track_info=None):
             f"[{THEME['accent']}]{track_info['sub_lang'] or 'None'}[/{THEME['accent']}] (ID: {track_info['sub_id'] or 'off'})",
             "[bold]s[/bold] to set, [bold]S[/bold] to clear"
         )
-        table.add_row(
-            "",
-            "[dim]Available tracks are detected from your stream.\nManual IDs: --aid=N (MPV) / :audio-track=N (VLC)[/dim]",
-            ""
-        )
+
+        if probed_tracks:
+            for ttype, color in [("audio", "green"), ("subtitle", "cyan")]:
+                items = probed_tracks.get(ttype, [])
+                if items:
+                    labels = ", ".join(item["label"] for item in items)
+                    table.add_row(
+                        f"[bold {color}]{ttype.capitalize()} Streams[/bold {color}]",
+                        f"[{color}]{labels}[/{color}]",
+                        ""
+                    )
+        else:
+            hint = "[dim]Install ffprobe (ffmpeg) to auto-detect available tracks[/dim]" if stream_url else "[dim]Available tracks are detected from your stream[/dim]"
+            table.add_row("", hint, "")
 
         panel = Panel(
             table,
@@ -2127,7 +2170,8 @@ def _handle_episode_selection(current, stack, ctx):
         _centered_message(f"Press [bold]T[/bold] for tracks, [bold]D[/bold] to queue for download, or [bold]Enter[/bold] to play...", level="info")
         key = read_key()
         if key in ('t', 'T'):
-            result = _show_track_selector(track_info)
+            probe_url = stream_urls[0] if stream_urls else None
+            result = _show_track_selector(track_info, stream_url=probe_url)
             if result is not None:
                 track_info = result
         elif key in ('d', 'D'):
