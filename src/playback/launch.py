@@ -7,7 +7,7 @@ from ..config import load_config
 from ..db import get_episode_progress
 
 
-def play(stream_urls, player="mpv", fullscreen=True, slug=None, episode=None, extra_args=None, provider=0):
+def play(stream_urls, player="mpv", slug=None, episode=None, extra_args=None, provider=0):
     if player == "mpv":
         return play_with_mpv(stream_urls, slug=slug, ep=episode, extra_args=extra_args, provider=provider)
     elif player == "vlc":
