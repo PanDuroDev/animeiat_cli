@@ -199,22 +199,17 @@ def _read_cookies(user_data_path, decrypted_key, is_gcm):
         if not os.path.exists(cookie_path):
             continue
 
-        temp_cookie_file = None
+        conn = None
         try:
-            tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-            temp_cookie_file = tmp.name
-            tmp.close()
-            shutil.copy2(cookie_path, temp_cookie_file)
-        except Exception as e:
-            print(f"[animeiat-cli] Warning: cookie DB copy failed for {cookie_path}: {e}")
-            continue
-
-        try:
-            conn = sqlite3.connect(temp_cookie_file)
+            conn = sqlite3.connect(cookie_path, timeout=1)
+            conn.execute("PRAGMA query_only=ON")
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT name, encrypted_value, host_key FROM cookies WHERE host_key LIKE '%anime3rb.com%' OR host_key LIKE '%vid3rb.com%' OR host_key LIKE '%witanime%' OR host_key LIKE '%anineko%' OR host_key LIKE '%gogoanime%' OR host_key LIKE '%hianime%' OR host_key LIKE '%9anime%'"
-            )
+            try:
+                cursor.execute(
+                    "SELECT name, encrypted_value, host_key FROM cookies WHERE host_key LIKE '%anime3rb.com%' OR host_key LIKE '%vid3rb.com%' OR host_key LIKE '%witanime%' OR host_key LIKE '%anineko%' OR host_key LIKE '%gogoanime%' OR host_key LIKE '%hianime%' OR host_key LIKE '%9anime%'"
+                )
+            except sqlite3.OperationalError:
+                continue
             for name, encrypted_value, host_key in cursor.fetchall():
                 domain = "." + host_key if not host_key.startswith(".") else host_key
                 try:
@@ -242,15 +237,11 @@ def _read_cookies(user_data_path, decrypted_key, is_gcm):
                 except Exception as e:
                     _cookie_warn(f"cookie decrypt failed: {e}")
                     cookies.pop(f"{domain}:{name}", None)
-            conn.close()
         except Exception as e:
             _cookie_warn(f"cookie profile failed: {e}")
         finally:
-            if temp_cookie_file:
-                try:
-                    os.remove(temp_cookie_file)
-                except Exception as e:
-                    _cookie_warn(f"temp file cleanup failed: {e}")
+            if conn:
+                conn.close()
 
     return list(cookies.values())
 

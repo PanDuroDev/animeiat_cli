@@ -9,6 +9,7 @@ from ._scraper import (
     fetch_episodes_list_async,
 )
 from ._utils import _classify_stream_quality, _is_cloudflare_challenge, normalize
+from src.config import load_config
 
 PROVIDER_ID = 2
 PROVIDER_NAME = "Anineko"
@@ -17,8 +18,10 @@ PROVIDER_NAME = "Anineko"
 async def search_gogoanime_async(query):
     query_enc = quote_plus(query)
     url = f"https://anineko.to/browser?keyword={query_enc}"
+    cfg = load_config()
+    verify_ssl = cfg.get("verify_ssl", True)
     try:
-        async with httpx.AsyncClient(timeout=15.0, verify=False) as client:
+        async with httpx.AsyncClient(timeout=15.0, verify=verify_ssl) as client:
             r = await client.get(url, headers={
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
             })

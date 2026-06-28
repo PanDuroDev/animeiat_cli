@@ -177,6 +177,7 @@ def load_config():
         "fullscreen": True,
         "custom_player_args": "",
         "nerd_fonts": False,
+        "verify_ssl": True,
         "scraping_method": "auto",
         "search_priorities": [0, 1],
         "search_history": [],

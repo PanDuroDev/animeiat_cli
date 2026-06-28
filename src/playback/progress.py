@@ -24,6 +24,7 @@ def start_progress_tracking(slug, episode, player_ipc_path, provider=0):
 def poll_mpv_progress(ipc_path, slug, ep, provider=0):
     client = None
     max_retries = 8
+    connect_warned = False
     for retry in range(max_retries):
         if _stop_event.is_set():
             return
@@ -32,8 +33,9 @@ def poll_mpv_progress(ipc_path, slug, ep, provider=0):
                 client = open(ipc_path, "r+b", buffering=0)
                 break
             except Exception as e:
-                if retry == 0:
+                if not connect_warned:
                     print(f"[animeiat-cli] Warning: IPC connect attempt failed: {e}")
+                    connect_warned = True
                 time.sleep(0.3)
         else:
             if os.path.exists(ipc_path):
@@ -43,7 +45,9 @@ def poll_mpv_progress(ipc_path, slug, ep, provider=0):
                     client.connect(ipc_path)
                     break
                 except Exception as e:
-                    print(f"[animeiat-cli] Warning: Unix socket connect failed: {e}")
+                    if not connect_warned:
+                        print(f"[animeiat-cli] Warning: Unix socket connect failed: {e}")
+                        connect_warned = True
                     time.sleep(0.3)
             else:
                 time.sleep(0.3)
@@ -53,6 +57,7 @@ def poll_mpv_progress(ipc_path, slug, ep, provider=0):
         return
 
     _last_saved_time_pos = None
+    read_warned = False
     try:
         while not _stop_event.is_set():
             time_cmd = json.dumps({"command": ["get_property", "time-pos"]}) + "\n"
@@ -77,8 +82,9 @@ def poll_mpv_progress(ipc_path, slug, ep, provider=0):
                         if resp.get("error") == "success":
                             time_pos = resp.get("data")
                 except Exception as e:
-                    if "Invalid argument" not in str(e):
+                    if not read_warned and "Invalid argument" not in str(e):
                         print(f"[animeiat-cli] Warning: IPC time-pos read failed: {e}")
+                        read_warned = True
                     break
 
                 try:
@@ -96,8 +102,9 @@ def poll_mpv_progress(ipc_path, slug, ep, provider=0):
                         if resp.get("error") == "success":
                             duration = resp.get("data")
                 except Exception as e:
-                    if "Invalid argument" not in str(e):
+                    if not read_warned and "Invalid argument" not in str(e):
                         print(f"[animeiat-cli] Warning: IPC duration read failed: {e}")
+                        read_warned = True
                     break
             else:
                 try:
@@ -114,7 +121,9 @@ def poll_mpv_progress(ipc_path, slug, ep, provider=0):
                         if resp.get("error") == "success":
                             time_pos = resp.get("data")
                 except Exception as e:
-                    print(f"[animeiat-cli] Warning: Unix IPC time-pos failed: {e}")
+                    if not read_warned:
+                        print(f"[animeiat-cli] Warning: IPC time-pos read failed: {e}")
+                        read_warned = True
                     break
 
                 try:
@@ -131,7 +140,9 @@ def poll_mpv_progress(ipc_path, slug, ep, provider=0):
                         if resp.get("error") == "success":
                             duration = resp.get("data")
                 except Exception as e:
-                    print(f"[animeiat-cli] Warning: Unix IPC duration failed: {e}")
+                    if not read_warned:
+                        print(f"[animeiat-cli] Warning: IPC duration read failed: {e}")
+                        read_warned = True
                     break
 
             if time_pos is not None:
@@ -153,15 +164,15 @@ def poll_mpv_progress(ipc_path, slug, ep, provider=0):
 
             _stop_event.wait(1.0)
     except Exception as e:
-        sys.stderr.write(f"[animeiat-cli] poll_mpv_progress error: {e}\n")
+        print(f"[animeiat-cli] poll_mpv_progress error: {e}")
     finally:
         try:
             client.close()
-        except Exception as e:
-            print(f"[animeiat-cli] Warning: IPC client close failed: {e}")
+        except Exception:
+            pass
         if os.name != 'nt':
             try:
                 if os.path.exists(ipc_path):
                     os.remove(ipc_path)
-            except Exception as e:
-                print(f"[animeiat-cli] Warning: IPC socket cleanup failed: {e}")
+            except Exception:
+                pass

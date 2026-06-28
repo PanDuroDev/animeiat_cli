@@ -21,6 +21,13 @@ from ._utils import (
 )
 from ._cookies import get_preferred_cookies, _cookie_warn
 
+_verify_ssl = None
+
+def _get_verify_ssl():
+    global _verify_ssl
+    if _verify_ssl is None:
+        _verify_ssl = load_config().get("verify_ssl", True)
+    return _verify_ssl
 
 def _select_scraping_method(cfg=None):
     if cfg is None:
@@ -281,7 +288,7 @@ async def _scrape_one_stream_httpx(ep_item, is_witanime, active_cookies=None):
             headers["Referer"] = url
             for embed_url in embed_urls:
                 try:
-                    async with httpx.AsyncClient(timeout=15.0, follow_redirects=True, verify=False) as c2:
+                    async with httpx.AsyncClient(timeout=15.0, follow_redirects=True, verify=_get_verify_ssl()) as c2:
                         er = await c2.get(embed_url, headers=headers)
                     if er.status_code == 200:
                         ehtml = er.text

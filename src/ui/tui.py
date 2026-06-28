@@ -8,7 +8,7 @@ _shared_loop = None
 
 def _run_async(coro):
     global _shared_loop
-    if _shared_loop is None:
+    if _shared_loop is None or _shared_loop.is_closed():
         _shared_loop = asyncio.new_event_loop()
         asyncio.set_event_loop(_shared_loop)
     return _shared_loop.run_until_complete(coro)
