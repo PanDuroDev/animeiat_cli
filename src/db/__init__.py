@@ -514,7 +514,7 @@ def get_watch_history(slug, provider=0):
 
 
 def save_account_token(platform, token, client_id=None, refresh_token=None, expires_in=None):
-    expires_at = time.time() + expires_in if expires_in else None
+    expires_at = time.time() + expires_in if expires_in else 0
     with _db_write_lock:
         conn = None
         try:
