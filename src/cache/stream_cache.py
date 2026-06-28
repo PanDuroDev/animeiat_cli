@@ -4,7 +4,7 @@ Stream cache implementation — SQLite-backed storage for resolved stream URLs.
 
 import time
 
-from src.db import get_db_connection
+from src.db import get_db_connection, _db_write_lock
 
 # Bump this when URL format changes to invalidate all old caches
 CACHE_VERSION = 2
@@ -15,21 +15,22 @@ def _cache_key(slug, provider):
 
 
 def cache_stream_url(slug, episode, stream_url, quality="", provider=0):
-    slug_key = _cache_key(slug, provider)
-    conn = None
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            "INSERT OR REPLACE INTO stream_cache (slug, episode, stream_url, fetched_at, quality) VALUES (?, ?, ?, ?, ?)",
-            (slug_key, episode, stream_url, time.time(), quality)
-        )
-        conn.commit()
-    except Exception as e:
-        print(f"[animeiat-cli] Warning: cache_stream_url failed: {e}")
-    finally:
-        if conn:
-            conn.close()
+    with _db_write_lock:
+        slug_key = _cache_key(slug, provider)
+        conn = None
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT OR REPLACE INTO stream_cache (slug, episode, stream_url, fetched_at, quality) VALUES (?, ?, ?, ?, ?)",
+                (slug_key, episode, stream_url, time.time(), quality)
+            )
+            conn.commit()
+        except Exception as e:
+            print(f"[animeiat-cli] Warning: cache_stream_url failed: {e}")
+        finally:
+            if conn:
+                conn.close()
 
 
 def get_cached_stream_url(slug, episode, provider=0, max_age_hours=24):
@@ -56,19 +57,20 @@ def get_cached_stream_url(slug, episode, provider=0, max_age_hours=24):
 
 
 def clear_stream_cache(slug=None, max_age_hours=24, provider=0):
-    conn = None
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cutoff = time.time() - max_age_hours * 3600
-        if slug:
-            slug_key = _cache_key(slug, provider)
-            cursor.execute("DELETE FROM stream_cache WHERE slug = ? AND fetched_at < ?", (slug_key, cutoff))
-        else:
-            cursor.execute("DELETE FROM stream_cache WHERE fetched_at < ?", (cutoff,))
-        conn.commit()
-    except Exception as e:
-        print(f"[animeiat-cli] Warning: clear_stream_cache failed: {e}")
-    finally:
-        if conn:
-            conn.close()
+    with _db_write_lock:
+        conn = None
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cutoff = time.time() - max_age_hours * 3600
+            if slug:
+                slug_key = _cache_key(slug, provider)
+                cursor.execute("DELETE FROM stream_cache WHERE slug = ? AND fetched_at < ?", (slug_key, cutoff))
+            else:
+                cursor.execute("DELETE FROM stream_cache WHERE fetched_at < ?", (cutoff,))
+            conn.commit()
+        except Exception as e:
+            print(f"[animeiat-cli] Warning: clear_stream_cache failed: {e}")
+        finally:
+            if conn:
+                conn.close()
