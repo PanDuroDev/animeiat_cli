@@ -35,6 +35,7 @@ jobs:
       matrix:
         os: [windows-latest, macos-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     defaults:
       run:
         shell: ${{ matrix.os == 'windows-latest' && 'pwsh' || 'bash' }}
@@ -62,17 +63,18 @@ jobs:
           pip install pyinstaller
 
       - name: Install Playwright browsers
+        if: runner.os != 'macOS'
         run: |
           pip install playwright
           python -m playwright install chromium
           python -m playwright install --with-deps chromium
         continue-on-error: true
 
-      - name: Build (onedir — default)
-        run: python build/build.py
+      - name: Build onedir
+        run: python build/build.py ${{ runner.os == 'macOS' && '--lite' || '' }}
 
-      - name: Build (onefile — standalone)
-        run: python build/build.py --onefile
+      - name: Build onefile
+        run: python build/build.py --onefile ${{ runner.os == 'macOS' && '--lite' || '' }}
 
       - name: Validate onedir build
         run: |
