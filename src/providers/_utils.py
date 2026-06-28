@@ -1,7 +1,33 @@
 import re
+import socket
 from urllib.parse import urlparse
 
 from src.config import load_config, THEME
+
+
+def detect_provider_from_url(url):
+    p = urlparse(url.strip())
+    netloc = p.netloc.lower()
+    domain = netloc.split(":")[0]
+    for pattern, provider_id in [
+        ("anime3rb.com", 0), ("www.anime3rb.com", 0),
+        ("witanime.bond", 1), ("www.witanime.bond", 1),
+        ("anitaku.to", 2), ("www.anitaku.to", 2),
+        ("gogoanime.cl", 2), ("gogoanime.bz", 2),
+        ("anineko.to", 2), ("www.anineko.to", 2),
+        ("hianime.to", 3), ("www.hianime.to", 3),
+        ("9anime.to", 4), ("www.9anime.to", 4),
+    ]:
+        if domain == pattern:
+            return provider_id
+    for pattern, provider_id in [
+        ("anime3rb", 0), ("witanime", 1),
+        ("anitaku", 2), ("gogoanime", 2), ("anineko", 2),
+        ("hianime", 3), ("9anime", 4),
+    ]:
+        if pattern in netloc:
+            return provider_id
+    return 0
 
 
 def validate_url(url):
@@ -14,6 +40,26 @@ def validate_url(url):
         return False, "URL is missing a domain name"
     if (not p.path or p.path.strip("/") == "") and not p.query:
         return False, "URL is missing a path or query string"
+
+    host = p.hostname or p.netloc.split(":")[0]
+    if host in ("localhost", "localhost6", "127.0.0.1", "0.0.0.0", "::1", "[::1]"):
+        return False, "URL points to loopback/localhost (possible SSRF)"
+    try:
+        addr = socket.getaddrinfo(host, 80, socket.AF_INET, socket.SOCK_STREAM)
+        for family, _, _, _, sockaddr in addr:
+            ip = sockaddr[0]
+            if ip.startswith("127.") or ip == "0.0.0.0":
+                return False, "URL resolves to a loopback address (possible SSRF)"
+            parts = ip.split(".")
+            if len(parts) == 4:
+                if parts[0] == "10":
+                    return False, "URL resolves to a private IP range (possible SSRF)"
+                if parts[0] == "172" and 16 <= int(parts[1]) <= 31:
+                    return False, "URL resolves to a private IP range (possible SSRF)"
+                if parts[0] == "192" and parts[1] == "168":
+                    return False, "URL resolves to a private IP range (possible SSRF)"
+    except socket.gaierror:
+        return False, "URL hostname could not be resolved"
     return True, ""
 
 
@@ -43,11 +89,6 @@ def extract_slug(url):
         m = re.search(r"/watch/([^/#?]+)", path)
         if m: return m.group(1)
 
-    path_clean = p.path.strip("/")
-    if path_clean:
-        parts = path_clean.split("/")
-        if parts:
-            return parts[-1]
     return None
 
 

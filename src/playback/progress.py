@@ -15,12 +15,13 @@ def stop_progress_tracking():
     _stop_event.set()
 
 
-def start_progress_tracking(slug, episode, player_ipc_path):
+def start_progress_tracking(slug, episode, player_ipc_path, provider=0):
+    stop_progress_tracking()
     _stop_event.clear()
-    threading.Thread(target=poll_mpv_progress, args=(player_ipc_path, slug, episode), daemon=True).start()
+    threading.Thread(target=poll_mpv_progress, args=(player_ipc_path, slug, episode, provider), daemon=True).start()
 
 
-def poll_mpv_progress(ipc_path, slug, ep):
+def poll_mpv_progress(ipc_path, slug, ep, provider=0):
     client = None
     for _ in range(20):
         if _stop_event.is_set():
@@ -49,6 +50,7 @@ def poll_mpv_progress(ipc_path, slug, ep):
         print(f"[animeiat-cli] Warning: could not connect to MPV IPC at {ipc_path}")
         return
 
+    _last_saved_time_pos = None
     try:
         while not _stop_event.is_set():
             time_cmd = json.dumps({"command": ["get_property", "time-pos"]}) + "\n"
@@ -129,10 +131,21 @@ def poll_mpv_progress(ipc_path, slug, ep):
                     break
 
             if time_pos is not None:
-                if duration and (time_pos / duration > 0.95):
-                    save_episode_progress(slug, ep, 0, duration)
-                else:
-                    save_episode_progress(slug, ep, time_pos, duration or 0)
+                dirty = False
+                if _last_saved_time_pos is None:
+                    dirty = True
+                elif duration and (time_pos / duration > 0.95):
+                    dirty = True
+                elif duration and abs(time_pos - _last_saved_time_pos) >= max(2.0, duration * 0.01):
+                    dirty = True
+                elif not duration and abs(time_pos - _last_saved_time_pos) >= 2.0:
+                    dirty = True
+                if dirty:
+                    if duration and (time_pos / duration > 0.95):
+                        save_episode_progress(slug, ep, 0, duration, provider=provider)
+                    else:
+                        save_episode_progress(slug, ep, time_pos, duration or 0, provider=provider)
+                    _last_saved_time_pos = time_pos
 
             _stop_event.wait(1.0)
     except Exception as e:

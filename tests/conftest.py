@@ -1,20 +1,39 @@
+import os
+import shutil
+import tempfile
+
 import pytest
-import respx
-from httpx import AsyncClient, ASGITransport
 
 
 @pytest.fixture
-def app():
-    return None
+def temp_dir():
+    path = tempfile.mkdtemp()
+    yield path
+    shutil.rmtree(path, ignore_errors=True)
 
 
 @pytest.fixture
-async def async_client():
-    async with AsyncClient(base_url="http://test") as client:
-        yield client
+def config_path_override(temp_dir, monkeypatch):
+    monkeypatch.setattr("src.config.get_config_dir", lambda: temp_dir)
+    monkeypatch.setattr("src.config.get_config_path", lambda: os.path.join(temp_dir, "config.json"))
+    monkeypatch.setattr("src.db.get_config_dir", lambda: temp_dir)
+    return temp_dir
 
 
 @pytest.fixture
-def mock_httpx():
-    with respx.mock as respx_mock:
-        yield respx_mock
+def db_path_override(temp_dir, monkeypatch):
+    monkeypatch.setattr("src.db.get_db_path", lambda: os.path.join(temp_dir, "test.db"))
+    return os.path.join(temp_dir, "test.db")
+
+
+@pytest.fixture
+def clean_db(db_path_override):
+    import src.db
+    src.db.init_db()
+    yield
+    for path in (db_path_override, db_path_override + "-wal", db_path_override + "-shm"):
+        try:
+            os.remove(path)
+        except (FileNotFoundError, PermissionError):
+            pass
+    src.db._db_write_lock = __import__("threading").Lock()

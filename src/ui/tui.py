@@ -2,6 +2,7 @@
 TUI components for animeiat-cli — interactive terminal UI, state machine, and widgets.
 """
 import asyncio
+import sqlite3
 
 _shared_loop = asyncio.new_event_loop()
 asyncio.set_event_loop(_shared_loop)
@@ -44,9 +45,10 @@ from src.db import (
     save_account_token, get_account_token, remove_account,
     fetch_anime_metadata,
     fetch_anilist_user_list, fetch_mal_user_list,
-    get_all_episode_progress,
+    get_all_episode_progress, get_all_favorites,
     add_download_entry, get_downloads, remove_download_entry, update_download_status,
 )
+from src.downloader import enqueue_selected
 from src.cache import cache_stream_url, get_cached_stream_url
 from src.playback.discovery import (
     get_cached_players, clear_player_cache,
@@ -57,8 +59,9 @@ from src.playback.launch import (
     play_with_vlc, play_with_mpv, play_with_iina,
     play_with_celluloid, play_with_haruna,
 )
+from src.playback.progress import stop_progress_tracking
 from src.playback.discovery import _invalidate_player_cfg as invalidate_player_cfg
-from src.providers._utils import validate_url, extract_slug
+from src.providers._utils import validate_url, extract_slug, detect_provider_from_url
 from src.providers._cookies import get_preferred_cookies
 from src.providers._scraper import fetch_episodes_list_async, scrape_multiple_streams_async
 from src.providers import registry as provider_registry, search_providers_for_media
@@ -1278,7 +1281,7 @@ def _handle_main_menu(current, stack, ctx):
         cursor.execute("SELECT COUNT(*) FROM favorites")
         fav_count = cursor.fetchone()[0]
         conn.close()
-    except Exception as e:
+    except sqlite3.Error as e:
         print(f"[animeiat-cli] Warning: favorites count DB query failed: {e}")
     update_info = check_for_update(APP_VERSION)
     menu_metadata = {
@@ -1467,15 +1470,6 @@ def _handle_search_results(current, stack, ctx):
     return True
 
 
-def _detect_provider_from_url(url):
-    p = urlparse(url)
-    if "witanime" in p.netloc:
-        return 1
-    if "anitaku" in p.netloc or "gogoanime" in p.netloc or "anineko" in p.netloc:
-        return 2
-    return 0
-
-
 def _handle_url_input(current, stack, ctx):
     anime_url = current.get("prefilled_url") or _centered_prompt("Enter Anime URL (or press Enter/Esc to go back)")
     if not anime_url:
@@ -1487,7 +1481,7 @@ def _handle_url_input(current, stack, ctx):
         return True
     anime_url = anime_url.strip()
     p = urlparse(anime_url)
-    is_witanime = _detect_provider_from_url(anime_url)
+    is_witanime = detect_provider_from_url(anime_url)
 
     if 'search_param=animes' in p.query:
         from urllib.parse import parse_qs
@@ -1597,16 +1591,7 @@ def _handle_url_input(current, stack, ctx):
 
 
 def _handle_favorites(current, stack, ctx):
-    favs = []
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT slug, title, url, is_witanime FROM favorites")
-        for row in cursor.fetchall():
-            favs.append({"slug": row[0], "title": row[1], "url": row[2], "is_witanime": int(row[3])})
-        conn.close()
-    except Exception as e:
-        print(f"[animeiat-cli] Warning: favorites DB query failed: {e}")
+    favs = get_all_favorites()
     if not favs:
         _centered_message("No favorites bookmarked yet.", level="warn")
         stack.pop()
@@ -1867,7 +1852,7 @@ def _settings_data_sync(cfg, stack):
                 cursor.execute("DELETE FROM accounts")
                 conn.commit()
                 conn.close()
-            except Exception as e:
+            except sqlite3.Error as e:
                 print(f"[animeiat-cli] Warning: DB cleanup failed: {e}")
             cfg["history"] = {}
             cfg["favorites"] = []
@@ -2007,7 +1992,7 @@ def _handle_episode_selection(current, stack, ctx):
     default_idx = 0
     if last_watched_idx != -1:
         default_idx = last_watched_idx + 1 if last_watched_idx + 1 < len(eps) else last_watched_idx
-    progress_data = get_all_episode_progress(slug)
+    progress_data = get_all_episode_progress(slug, provider=is_witanime)
     ep_options = []
     for x in eps:
         ep_num = x['episode']
@@ -2146,12 +2131,8 @@ def _handle_episode_selection(current, stack, ctx):
             if result is not None:
                 track_info = result
         elif key in ('d', 'D'):
-            for ep in eps_to_scrape:
-                ep_num = ep["episode"]
-                u_str = cached_urls.get(ep_num)
-                if u_str:
-                    add_download_entry(slug, ep_num, u_str)
-            _centered_message(f"{len(eps_to_scrape)} episode(s) queued for download.\nAccess 'Download Manager' in Settings to manage.", level="ok")
+            queued = enqueue_selected(eps_to_scrape, cached_urls, slug)
+            _centered_message(f"{queued} episode(s) queued for download.\nCheck 'Download Manager' in the menu for progress.", level="ok")
             return True
         elif key in (KEY_ESC, KEY_CTRL_C):
             return True
@@ -2172,15 +2153,15 @@ def _handle_episode_selection(current, stack, ctx):
                 track_args.append(f":sub-track={track_info['sub_id']}")
         _centered_message(f"Launching {player_name} with {len(stream_urls)} stream(s)...", level="info")
         if player_name == "MPV":
-            launch_success = play_with_mpv(stream_urls, slug=slug, ep=eps_to_scrape[0]["episode"], extra_args=track_args)
+            launch_success = play_with_mpv(stream_urls, slug=slug, ep=eps_to_scrape[0]["episode"], extra_args=track_args, provider=is_witanime)
         elif player_name == "VLC":
-            launch_success = play_with_vlc(stream_urls, extra_args=track_args)
+            launch_success = play_with_vlc(stream_urls, extra_args=track_args, slug=slug, ep=eps_to_scrape[0]["episode"], provider=is_witanime)
         elif player_name == "IINA":
-            launch_success = play_with_iina(stream_urls, extra_args=track_args)
+            launch_success = play_with_iina(stream_urls, extra_args=track_args, slug=slug, ep=eps_to_scrape[0]["episode"], provider=is_witanime)
         elif player_name == "Celluloid":
-            launch_success = play_with_celluloid(stream_urls, extra_args=track_args)
+            launch_success = play_with_celluloid(stream_urls, extra_args=track_args, slug=slug, ep=eps_to_scrape[0]["episode"], provider=is_witanime)
         elif player_name == "Haruna":
-            launch_success = play_with_haruna(stream_urls, extra_args=track_args)
+            launch_success = play_with_haruna(stream_urls, extra_args=track_args, slug=slug, ep=eps_to_scrape[0]["episode"], provider=is_witanime)
         if launch_success:
             for ep_num in ep_numbers:
                 add_watch_history(slug, ep_num, anime_title, provider=is_witanime)
@@ -2205,33 +2186,29 @@ def _handle_export():
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        cursor.execute("SELECT slug, last_watched FROM shows ORDER BY slug")
-        shows = cursor.fetchall()
-
-        cursor.execute("SELECT slug, episode FROM watched_episodes ORDER BY slug, episode")
-        watched = cursor.fetchall()
-
-        cursor.execute("SELECT slug, episode, time_pos, duration FROM episode_progress ORDER BY slug, episode")
+        cursor.execute("SELECT slug, episode, time_pos, duration, provider FROM episode_progress ORDER BY slug, episode")
         progress = cursor.fetchall()
 
         conn.close()
-    except Exception as e:
+    except sqlite3.Error as e:
         _centered_message(f"Database read error: {e}", level="error")
         return
+
+    shows = {}
+    watched = {}
+    prog_dict = {}
+    for slug, ep, tp, dur, _prov in progress:
+        shows[slug] = max(shows.get(slug, 0), ep)
+        watched.setdefault(slug, []).append(ep)
+        prog_dict.setdefault(slug, []).append({"episode": ep, "time_pos": tp, "duration": dur})
 
     data = {
         "exported_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "version": APP_VERSION,
-        "shows": {slug: {"last_watched": lw} for slug, lw in shows},
-        "watched_episodes": {slug: [] for slug, _ in shows},
-        "episode_progress": {},
+        "shows": {k: {"last_watched": v} for k, v in shows.items()},
+        "watched_episodes": watched,
+        "episode_progress": prog_dict,
     }
-
-    for slug, ep in watched:
-        data["watched_episodes"].setdefault(slug, []).append(ep)
-
-    for slug, ep, tp, dur in progress:
-        data["episode_progress"].setdefault(slug, []).append({"episode": ep, "time_pos": tp, "duration": dur})
 
     export_dir = get_config_dir()
     ts = time.strftime("%Y%m%d_%H%M%S")
@@ -2257,32 +2234,68 @@ def _handle_export():
 
 
 def _handle_download_manager(current, stack, ctx):
+    from src.downloader import start_download, get_download_dir
     downloads = get_downloads()
     if not downloads:
-        _centered_message("No downloads queued yet. Select episodes and choose 'Download' to add them.", level="warn")
+        _centered_message("No downloads queued yet. Select episodes and choose 'D' to add them.", level="warn")
         stack.pop()
         return True
 
+    status_emoji = {
+        "completed": get_icon("check"),
+        "downloading": get_icon("watch_history"),
+        "pending": " ",
+        "failed": get_icon("cross"),
+    }
+
     options = []
     for d in downloads:
-        status_icon = get_icon("check") if d["status"] == "completed" else (get_icon("watch_history") if d["status"] == "downloading" else get_icon("cross"))
-        options.append(f"Ep {d['episode']} ({d['slug']}) [{status_icon} {d['status']}]")
+        icon = status_emoji.get(d["status"], get_icon("cross"))
+        label = d["status"]
+        if d["status"] == "completed":
+            fname = os.path.basename(d.get("file_path", "")) if d.get("file_path") else ""
+            label = f"done {fname}" if fname else "done"
+        options.append(f"Ep {d['episode']} ({d['slug']}) [{icon} {label}]")
 
-    idx, opt = interactive_select(options, "Download Manager")
+    idx, opt = interactive_select(options, "Download Manager (select to manage)")
     if idx == -1:
         stack.pop()
         return True
 
     selected = downloads[idx]
     if selected["status"] == "completed":
-        _centered_message(f"Already downloaded: {selected.get('file_path', 'unknown')}\nStream URL: {selected['stream_url']}", level="info")
+        fp = selected.get("file_path", "")
+        _centered_message(
+            f"Downloaded: {fp if fp else 'location unknown'}\nURL: {selected['stream_url']}",
+            level="info"
+        )
+    elif selected["status"] == "failed":
+        _centered_message(
+            f"Episode {selected['episode']} — Download failed.\nURL: {selected['stream_url']}",
+            level="error"
+        )
+        retry = _centered_prompt("Retry download? (y/N)")
+        if retry and retry.lower() == 'y':
+            start_download(selected["slug"], selected["episode"], selected["stream_url"], selected.get("quality", ""))
+            _centered_message("Re-queued for download.", level="info")
+    elif selected["status"] == "downloading":
+        _centered_message(f"Still downloading episode {selected['episode']}...", level="info")
     else:
-        _centered_message(f"Episode {selected['episode']} \u2014 Status: {selected['status']}\nStream URL: {selected['stream_url']}", level="info")
-        remove = _centered_prompt("Remove this download entry? (y/N)")
-        if remove and remove.lower() == 'y':
-            remove_download_entry(selected["slug"], selected["episode"])
+        _centered_message(
+            f"Episode {selected['episode']} — Status: {selected['status']}\nURL: {selected['stream_url']}",
+            level="info"
+        )
+        start_now = _centered_prompt("Start download now? (y/N)")
+        if start_now and start_now.lower() == 'y':
+            start_download(selected["slug"], selected["episode"], selected["stream_url"], selected.get("quality", ""))
+            _centered_message("Download started.", level="info")
 
-    _centered_message("Done.", level="info")
+    remove = _centered_prompt("Remove this entry? (y/N)")
+    if remove and remove.lower() == 'y':
+        remove_download_entry(selected["slug"], selected["episode"])
+        _centered_message("Entry removed.", level="info")
+
+    _centered_message(f"Downloads folder: {get_download_dir()}", level="info")
     return True
 
 
@@ -2291,43 +2304,47 @@ def _handle_continue_watching(current, stack, ctx):
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT DISTINCT s.slug, s.last_watched
-            FROM shows s
-            ORDER BY s.last_watched DESC
+            SELECT slug, MAX(episode) as last_watched, provider
+            FROM episode_progress
+            GROUP BY slug, provider
+            ORDER BY MAX(episode) DESC
             LIMIT 50
         """)
         rows = cursor.fetchall()
         conn.close()
-    except Exception as e:
+    except sqlite3.Error as e:
         print(f"[animeiat-cli] Warning: continue watching query failed: {e}")
         rows = []
     if not rows:
         _centered_message("No watch history found. Watch some episodes first!", level="info")
         stack.pop()
         return True
+    _PROVIDER_URL_PATTERNS = [
+        "https://anime3rb.com/titles/{slug}",
+        "https://witanime.bond/anime/{slug}",
+        "https://anitaku.to/category/{slug}",
+        "https://hianime.to/watch/{slug}",
+        "https://9anime.to/watch/{slug}",
+    ]
     items = []
-    for slug_key, last_watched in rows:
-        bare_slug = slug_key.rsplit("_", 1)[0]
-        provider = 0
-        try:
-            prov = int(slug_key.rsplit("_", 1)[1])
-            provider = prov
-        except (ValueError, IndexError):
-            pass
-        title = bare_slug
+    for slug, last_watched, provider in rows:
+        title = slug
         anime_url = ""
         try:
             conn = get_db_connection()
             c = conn.cursor()
-            c.execute("SELECT title, url FROM favorites WHERE slug = ?", (bare_slug,))
+            c.execute("SELECT title, url FROM favorites WHERE slug = ?", (slug,))
             fav_row = c.fetchone()
             if fav_row:
-                title = fav_row[0] if fav_row[0] else bare_slug
+                title = fav_row[0] if fav_row[0] else slug
                 anime_url = fav_row[1] if fav_row[1] else ""
             conn.close()
         except Exception as e:
             print(f"[animeiat-cli] Warning: continue watching fav lookup failed: {e}")
-        items.append({"slug": bare_slug, "title": title, "url": anime_url, "is_witanime": provider, "last_watched": last_watched})
+        if not anime_url and 0 <= provider < len(_PROVIDER_URL_PATTERNS):
+            anime_url = _PROVIDER_URL_PATTERNS[provider].format(slug=slug)
+        if anime_url:
+            items.append({"slug": slug, "title": title, "url": anime_url, "is_witanime": provider, "last_watched": last_watched})
     if not items:
         _centered_message("No watch history found. Watch some episodes first!", level="info")
         stack.pop()
@@ -2441,3 +2458,5 @@ def run_app(initial_url=None, player_override=None, quality_override=None):
                 stack.pop()
             else:
                 break
+
+    stop_progress_tracking()

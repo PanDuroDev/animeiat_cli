@@ -18,6 +18,7 @@ from src.db import (
     get_db_path, init_db, migrate_json_to_sqlite,
     add_watch_history, add_download_entry,
 )
+from src.downloader import download_and_wait
 from src.cache import get_cached_stream_url
 from src.playback.discovery import (
     get_cached_players,
@@ -27,11 +28,11 @@ from src.playback.launch import (
     play_with_vlc, play_with_mpv, play_with_iina,
     play_with_celluloid, play_with_haruna,
 )
-from src.providers._utils import validate_url, extract_slug
+from src.providers._utils import validate_url, extract_slug, detect_provider_from_url
 from src.providers._cookies import get_preferred_cookies
 from src.providers._scraper import fetch_episodes_list_async, scrape_multiple_streams_async
 
-from .tui import (
+from src.ui.tui import (
     clear_screen, enter_alt_screen, exit_alt_screen, run_app,
 )
 
@@ -60,7 +61,7 @@ def run_noninteractive(initial_url, player_override=None, quality_override=None,
 
     anime_url = initial_url.strip()
     p = urlparse(anime_url)
-    is_witanime = 1 if "witanime" in p.netloc else 2 if "anitaku" in p.netloc or "gogoanime" in p.netloc or "anineko" in p.netloc else 0
+    is_witanime = detect_provider_from_url(anime_url)
     slug = extract_slug(anime_url)
     if not slug:
         _emit({"error": f"Could not extract slug from URL: {anime_url}", "success": False}, exit_code=1)
@@ -95,9 +96,10 @@ def run_noninteractive(initial_url, player_override=None, quality_override=None,
     if quality_override:
         _config_cache["default_quality"] = quality_override
 
-    eps_to_scrape = [eps[0]]
+    eps_to_scrape = eps if download_mode else [eps[0]]
     if not json_output:
-        print(f"Scraping stream URL for episode {eps[0]['episode']}...")
+        msg = f"Scraping stream URLs for {len(eps_to_scrape)} episode(s)..."
+        print(msg)
     try:
         results = asyncio.run(scrape_multiple_streams_async(eps_to_scrape, is_witanime, active_cookies))
     except KeyboardInterrupt:
@@ -110,12 +112,20 @@ def run_noninteractive(initial_url, player_override=None, quality_override=None,
         _emit({"error": "No stream URLs resolved.", "success": False}, exit_code=1)
 
     if download_mode:
+        queued = 0
         for ep in eps_to_scrape:
             ep_num = ep["episode"]
             u_str = results.get(ep_num)
             if u_str:
-                add_download_entry(slug, ep_num, u_str)
-        _emit({"slug": slug, "queued": len(stream_urls), "mode": "download", "success": True}, exit_code=0)
+                add_download_entry(slug, ep_num, u_str, quality=quality_override or "")
+                print(f"  Downloading episode {ep_num}...")
+                ok = download_and_wait(slug, ep_num, u_str, quality=quality_override or "")
+                if ok:
+                    queued += 1
+                    print(f"  Episode {ep_num} downloaded.")
+                else:
+                    print(f"  Episode {ep_num} download failed.")
+        _emit({"slug": slug, "queued": queued, "mode": "download", "success": queued > 0}, exit_code=0 if queued > 0 else 1)
 
     if json_output:
         _emit({"slug": slug, "episode": eps[0]["episode"], "stream_urls": stream_urls, "success": True, "mode": "stream"}, exit_code=0)
@@ -172,15 +182,15 @@ def run_noninteractive(initial_url, player_override=None, quality_override=None,
 
     launch_success = False
     if player_name == "MPV":
-        launch_success = play_with_mpv(stream_urls, slug=slug, ep=eps_to_scrape[0]["episode"])
+        launch_success = play_with_mpv(stream_urls, slug=slug, ep=eps_to_scrape[0]["episode"], provider=is_witanime)
     elif player_name == "VLC":
-        launch_success = play_with_vlc(stream_urls)
+        launch_success = play_with_vlc(stream_urls, slug=slug, ep=eps_to_scrape[0]["episode"], provider=is_witanime)
     elif player_name == "IINA":
-        launch_success = play_with_iina(stream_urls)
+        launch_success = play_with_iina(stream_urls, slug=slug, ep=eps_to_scrape[0]["episode"], provider=is_witanime)
     elif player_name == "Celluloid":
-        launch_success = play_with_celluloid(stream_urls)
+        launch_success = play_with_celluloid(stream_urls, slug=slug, ep=eps_to_scrape[0]["episode"], provider=is_witanime)
     elif player_name == "Haruna":
-        launch_success = play_with_haruna(stream_urls)
+        launch_success = play_with_haruna(stream_urls, slug=slug, ep=eps_to_scrape[0]["episode"], provider=is_witanime)
 
     if launch_success:
         if not json_output:
@@ -286,3 +296,7 @@ def main():
         input("\nAn unexpected error occurred. Press Enter to exit...")
     finally:
         exit_alt_screen()
+
+
+if __name__ == "__main__":
+    main()

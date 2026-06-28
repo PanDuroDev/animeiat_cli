@@ -16,6 +16,7 @@ def _cache_key(slug, provider):
 
 def cache_stream_url(slug, episode, stream_url, quality="", provider=0):
     slug_key = _cache_key(slug, provider)
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -24,13 +25,16 @@ def cache_stream_url(slug, episode, stream_url, quality="", provider=0):
             (slug_key, episode, stream_url, time.time(), quality)
         )
         conn.commit()
-        conn.close()
     except Exception as e:
         print(f"[animeiat-cli] Warning: cache_stream_url failed: {e}")
+    finally:
+        if conn:
+            conn.close()
 
 
 def get_cached_stream_url(slug, episode, provider=0, max_age_hours=24):
     slug_key = _cache_key(slug, provider)
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -39,17 +43,20 @@ def get_cached_stream_url(slug, episode, provider=0, max_age_hours=24):
             (slug_key, episode)
         )
         row = cursor.fetchone()
-        conn.close()
         if row:
             fetched_at = row[1]
             if time.time() - fetched_at < max_age_hours * 3600:
                 return {"stream_url": row[0], "quality": row[2]}
     except Exception as e:
         print(f"[animeiat-cli] Warning: get_cached_stream_url failed: {e}")
+    finally:
+        if conn:
+            conn.close()
     return None
 
 
 def clear_stream_cache(slug=None, max_age_hours=24, provider=0):
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -60,6 +67,8 @@ def clear_stream_cache(slug=None, max_age_hours=24, provider=0):
         else:
             cursor.execute("DELETE FROM stream_cache WHERE fetched_at < ?", (cutoff,))
         conn.commit()
-        conn.close()
     except Exception as e:
         print(f"[animeiat-cli] Warning: clear_stream_cache failed: {e}")
+    finally:
+        if conn:
+            conn.close()
