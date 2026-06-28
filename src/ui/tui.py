@@ -918,13 +918,15 @@ def interactive_select(options, title="Select Option", context_type=None, metada
                 def _sync_update(renderable=None):
                     if renderable is None:
                         renderable = make_panel()
-                    sys.stdout.write("\033[?2026h")
-                    live.update(renderable)
-                    sys.stdout.write("\033[?2026l")
+                    try:
+                        sys.stdout.write("\033[?2026h")
+                        live.update(renderable)
+                    finally:
+                        sys.stdout.write("\033[?2026l")
                 _sync_update()
                 while True:
                     key = read_key()
-                    
+
                     if _filter_active:
                         if key == KEY_ENTER:
                             _filter_active = False
@@ -1102,7 +1104,7 @@ def interactive_priority_list(labels, current_order):
             while True:
                 live.update(make_panel())
                 key = read_key()
-                if key in ("q", "escape"):
+                if key in ("q", "esc"):
                     return None
                 elif key == "enter":
                     return order
@@ -1299,9 +1301,11 @@ def interactive_checklist(options, title="Select Episodes", default_start_idx=0,
                 def _sync_update(renderable=None):
                     if renderable is None:
                         renderable = make_panel()
-                    sys.stdout.write("\033[?2026h")
-                    live.update(renderable)
-                    sys.stdout.write("\033[?2026l")
+                    try:
+                        sys.stdout.write("\033[?2026h")
+                        live.update(renderable)
+                    finally:
+                        sys.stdout.write("\033[?2026l")
                 _sync_update()
                 while True:
                     key = read_key()
@@ -1880,7 +1884,7 @@ def _settings_player(cfg, ctx):
 def _settings_search_sources(cfg):
     while True:
         scrap_method = cfg.get("scraping_method", "auto")
-        priorities = cfg.get("search_priorities", [0, 1, 2])
+        priorities = cfg.get("search_priorities", [0, 1])
         method_labels = {"auto": "Auto (httpx -> Playwright)", "playwright_only": "Playwright Only", "alternative_only": "httpx Only"}
         opts = [
             f"Search Source Priorities   (Current: {len(priorities)} providers)",
@@ -1892,10 +1896,12 @@ def _settings_search_sources(cfg):
         if sel_idx == -1 or sel_idx == 3:
             break
         if sel_idx == 0:
-            provider_options = ["Anime3rb (0)", "WitAnime (1)", "Anineko (2)"]
-            old_priorities = cfg.get("search_priorities", [0, 1, 2])
-            current_order = [p for p in old_priorities if p in [0, 1, 2]]
-            missing = [p for p in [0, 1, 2] if p not in current_order]
+            from src.config import PROVIDER_IDS as _PID
+            all_ids = sorted(_PID.keys())
+            provider_options = [f"{_PID[pid]} ({pid})" for pid in all_ids]
+            old_priorities = cfg.get("search_priorities", [0, 1])
+            current_order = [p for p in old_priorities if p in all_ids]
+            missing = [p for p in all_ids if p not in current_order]
             new_priorities = current_order + missing
             selected = interactive_priority_list(
                 provider_options, new_priorities,

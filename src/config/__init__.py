@@ -178,7 +178,7 @@ def load_config():
         "custom_player_args": "",
         "nerd_fonts": False,
         "scraping_method": "auto",
-        "search_priorities": [0, 1, 2],
+        "search_priorities": [0, 1],
         "search_history": [],
         "download_dir": "",
         "favorites": [],
@@ -193,7 +193,7 @@ def load_config():
             cfg = json.load(f)
             if "enabled_sources" in cfg and "search_priorities" not in cfg:
                 old = cfg.pop("enabled_sources")
-                cfg["search_priorities"] = [p for p in [0, 1, 2] if p in old]
+                cfg["search_priorities"] = [p for p in [0, 1, 2, 3, 4] if p in old]
             for k, v in default_cfg.items():
                 if k not in cfg:
                     cfg[k] = v
@@ -279,6 +279,8 @@ PROVIDER_IDS = {
     0: "Anime3rb",
     1: "WitAnime",
     2: "Anineko",
+    3: "HiAnime",
+    4: "9anime",
 }
 
 def get_provider_name(val):
