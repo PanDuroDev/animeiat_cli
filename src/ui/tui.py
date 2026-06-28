@@ -1625,8 +1625,6 @@ def _handle_settings(current, stack, ctx):
     history_enabled = cfg.get("history_tracking", True)
     fullscreen_enabled = cfg.get("fullscreen", True)
     player_args = cfg.get("custom_player_args", "")
-    vlc = ctx["vlc"]; mpv = ctx["mpv"]; iina = ctx["iina"]
-    celluloid = ctx["celluloid"]; haruna = ctx["haruna"]
 
     while True:
         cat_opts = [
@@ -1646,7 +1644,7 @@ def _handle_settings(current, stack, ctx):
             return True
 
         if cat_idx == 0:
-            _settings_player(cfg)
+            _settings_player(cfg, ctx)
         elif cat_idx == 1:
             _settings_search_sources(cfg)
         elif cat_idx == 2:
@@ -1662,12 +1660,13 @@ def _handle_settings(current, stack, ctx):
     return True
 
 
-def _settings_player(cfg):
+def _settings_player(cfg, ctx):
     history_enabled = cfg.get("history_tracking", True)
     fullscreen_enabled = cfg.get("fullscreen", False)
     player_args = cfg.get("custom_player_args", "")
     current_player = cfg.get("preferred_player", "auto")
     current_quality = cfg.get("default_quality", "auto")
+    _player_paths = {k: ctx.get(k) for k in ("mpv", "vlc", "iina", "celluloid", "haruna")}
 
     while True:
         opts = [
@@ -1688,11 +1687,11 @@ def _settings_player(cfg):
                 save_config(cfg)
                 invalidate_player_cfg()
                 is_missing = False
-                if p_opt == "mpv" and not find_mpv(): is_missing = True
-                elif p_opt == "vlc" and not find_vlc(): is_missing = True
-                elif p_opt == "iina" and not find_iina(): is_missing = True
-                elif p_opt == "celluloid" and not find_celluloid(): is_missing = True
-                elif p_opt == "haruna" and not find_haruna(): is_missing = True
+                if p_opt == "mpv" and not _player_paths["mpv"]: is_missing = True
+                elif p_opt == "vlc" and not _player_paths["vlc"]: is_missing = True
+                elif p_opt == "iina" and not _player_paths["iina"]: is_missing = True
+                elif p_opt == "celluloid" and not _player_paths["celluloid"]: is_missing = True
+                elif p_opt == "haruna" and not _player_paths["haruna"]: is_missing = True
                 if is_missing:
                     c_idx, _ = interactive_select([f"Yes, install {p_opt.upper()} now", "No, install it manually later"], f"{p_opt.upper()} not found \u2014 install?")
                     if c_idx == 0:
