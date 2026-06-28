@@ -216,6 +216,7 @@ def _read_cookies(user_data_path, decrypted_key, is_gcm):
                 "SELECT name, encrypted_value, host_key FROM cookies WHERE host_key LIKE '%anime3rb.com%' OR host_key LIKE '%vid3rb.com%' OR host_key LIKE '%witanime%' OR host_key LIKE '%anineko%' OR host_key LIKE '%gogoanime%' OR host_key LIKE '%hianime%' OR host_key LIKE '%9anime%'"
             )
             for name, encrypted_value, host_key in cursor.fetchall():
+                domain = "." + host_key if not host_key.startswith(".") else host_key
                 try:
                     if is_gcm:
                         if encrypted_value[:3] == b'v10' or encrypted_value[:3] == b'v11':
@@ -231,10 +232,6 @@ def _read_cookies(user_data_path, decrypted_key, is_gcm):
                                 continue
                     else:
                         value = decrypt_cbc_cookie(encrypted_value, decrypted_key)
-
-                    domain = host_key
-                    if not domain.startswith("."):
-                        domain = "." + domain
 
                     cookies[f"{domain}:{name}"] = {
                         "name": name,

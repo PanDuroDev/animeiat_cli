@@ -2612,3 +2612,5 @@ def run_app(initial_url=None, player_override=None, quality_override=None):
                 break
 
     stop_progress_tracking()
+    sys.stdout.write("\033[?2026l")
+    sys.stdout.flush()

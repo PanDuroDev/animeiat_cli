@@ -43,6 +43,11 @@ def _show_cursor():
     sys.stdout.flush()
 
 
+def _reset_terminal():
+    sys.stdout.write("\033[?2026l\033[?1049l\033[?25h\033[0m")
+    sys.stdout.flush()
+
+
 def run_noninteractive(initial_url, player_override=None, quality_override=None,
                        json_output=False, list_episodes=False, download_mode=False):
     def _emit(data_dict, exit_code=0):
@@ -290,11 +295,10 @@ def main():
     try:
         run_app(initial_url=args.url, player_override=player_override, quality_override=quality_override)
     except Exception as e:
-        exit_alt_screen()
         traceback.print_exc()
         input("\nAn unexpected error occurred. Press Enter to exit...")
     finally:
-        exit_alt_screen()
+        _reset_terminal()
 
 
 if __name__ == "__main__":
