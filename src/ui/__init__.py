@@ -50,10 +50,8 @@ from .tui import (
     run_app,
 )
 
-from .cli import (
-    run_noninteractive,
-    main,
-)
+# cli is imported lazily to avoid circular-import warnings with `python -m src.ui.cli`
+# Use `from src.ui.cli import main` explicitly when needed.
 
 __all__ = [
     "detect_layout_mode",
@@ -77,6 +75,4 @@ __all__ = [
     "interactive_select",
     "interactive_checklist",
     "run_app",
-    "run_noninteractive",
-    "main",
 ]

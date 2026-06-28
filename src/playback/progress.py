@@ -16,6 +16,7 @@ def stop_progress_tracking():
 
 
 def start_progress_tracking(slug, episode, player_ipc_path):
+    stop_progress_tracking()  # stop any previous zombie thread
     _stop_event.clear()
     threading.Thread(target=poll_mpv_progress, args=(player_ipc_path, slug, episode), daemon=True).start()
 

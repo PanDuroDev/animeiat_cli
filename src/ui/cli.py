@@ -32,7 +32,7 @@ from src.providers._utils import validate_url, extract_slug
 from src.providers._cookies import get_preferred_cookies
 from src.providers._scraper import fetch_episodes_list_async, scrape_multiple_streams_async
 
-from .tui import (
+from src.ui.tui import (
     clear_screen, enter_alt_screen, exit_alt_screen, run_app,
 )
 
@@ -295,3 +295,7 @@ def main():
         input("\nAn unexpected error occurred. Press Enter to exit...")
     finally:
         exit_alt_screen()
+
+
+if __name__ == "__main__":
+    main()

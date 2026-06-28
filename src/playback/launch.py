@@ -1,9 +1,8 @@
 import os
 import subprocess
-import threading
 
 from .discovery import get_cached_players, _get_player_cfg
-from .progress import poll_mpv_progress
+from .progress import start_progress_tracking
 from ..config import load_config
 from ..db import get_episode_progress
 
@@ -83,7 +82,7 @@ def play_with_mpv(stream_urls, slug=None, ep=None, extra_args=None):
             subprocess.Popen(cmd, start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
         if ipc_path:
-            threading.Thread(target=poll_mpv_progress, args=(ipc_path, slug, ep), daemon=True).start()
+            start_progress_tracking(slug, ep, ipc_path)
 
         return True
     except Exception as e:

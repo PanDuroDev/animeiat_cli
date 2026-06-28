@@ -58,6 +58,7 @@ from src.playback.launch import (
     play_with_vlc, play_with_mpv, play_with_iina,
     play_with_celluloid, play_with_haruna,
 )
+from src.playback.progress import stop_progress_tracking
 from src.playback.discovery import _invalidate_player_cfg as invalidate_player_cfg
 from src.providers._utils import validate_url, extract_slug
 from src.providers._cookies import get_preferred_cookies
@@ -2474,3 +2475,5 @@ def run_app(initial_url=None, player_override=None, quality_override=None):
                 stack.pop()
             else:
                 break
+
+    stop_progress_tracking()
