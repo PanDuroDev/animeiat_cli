@@ -12,6 +12,8 @@
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue?style=for-the-badge)
 ![Platform](https://img.shields.io/badge/platform-windows%20%7C%20macos%20%7C%20linux-lightgrey?style=for-the-badge)
 [![Latest Release](https://img.shields.io/github/v/release/PanDuroDev/animeiat_cli?style=for-the-badge)](https://github.com/PanDuroDev/animeiat_cli/releases)
+[![Tests](https://img.shields.io/badge/tests-71%20passing-brightgreen?style=for-the-badge)](https://github.com/PanDuroDev/animeiat_cli/actions)
+[![Issues](https://img.shields.io/badge/issues-0%20open-success?style=for-the-badge)](https://github.com/PanDuroDev/animeiat_cli/issues)
 
 ## المحتويات
 
@@ -42,11 +44,11 @@ animeiat-cli هو برنامج يعمل في الطرفية (Terminal) الخا�
 
 الإمكانيات الرئيسية:
 
-- البحث عن الأنمي بالاسم عبر عدة مواقع مصدر.
-- تصفح قوائم الحلقات باستخدام أزرار لوحة المفاتيح.
-- تشغيل الحلقات مباشرة في VLC أو MPV أو أي مشغل آخر مثبت.
-- استئناف المشاهدة من حيث توقفت — يتم حفظ سجل المشاهدة محليًا.
-- حفظ العروض المفضلة أو تحميل الحلقات للمشاهدة دون اتصال.
+- البحث عن الأنمي بالاسم عبر 5 مواقع مصدر (Anime3rb, WitAnime, Anineko/Gogoanime, HiAnime, 9anime).
+- تصفح قوائم الحلقات باستخدام أزرار لوحة المفاتيح (تصفية، ترتيب، لوحة تفاصيل).
+- تشغيل الحلقات مباشرة في VLC أو MPV أو IINA أو Celluloid أو Haruna.
+- استئناف المشاهدة من حيث توقفت — يُحفظ سجل المشاهدة وتقدّم التشغيل لكل حلقة محليًا.
+- حفظ العروض المفضلة أو تحميل الحلقات دفعة واحدة للمشاهدة دون اتصال.
 - جميع البيانات تبقى على جهازك. لا حاجة لحساب أو تسجيل.
 
 ### قبل البدء
@@ -124,7 +126,7 @@ docker run -it animeiat-cli
 
 ### كيفية الاستخدام
 
-شغّل `python anime_cli.py` لبدء الواجهة التفاعلية (TUI).
+شغّل `animeiat-cli` (أو `python -m src.ui.cli`) لبدء الواجهة التفاعلية (TUI).
 
 القائمة الرئيسية تعرض هذه الخيارات:
 
@@ -144,16 +146,16 @@ docker run -it animeiat-cli
 
 ```bash
 # تشغيل رابط معين مباشرة
-python anime_cli.py --url https://example.com/anime/... --no-tui
+animeiat-cli --url https://anime3rb.com/titles/naruto --no-tui
 
-# عرض الحلقات بصيغة JSON
-python anime_cli.py --url https://... --list-episodes --json
+# عرض الحلقات بصيغة JSON (تحميل كل الحلقات مع --download)
+animeiat-cli --url https://... --list-episodes --json
 
-# إضافة حلقة لقائمة التحميل
-python anime_cli.py --url https://... --download
+# تحميل جميع الحلقات دفعة واحدة
+animeiat-cli --url https://... --download
 
 # عرض الإصدار
-python anime_cli.py --version
+animeiat-cli --version
 ```
 
 ### حل المشكلات الشائعة
@@ -341,30 +343,39 @@ animeiat-cli/
 ├── src/
 │   ├── __init__.py
 │   ├── chromium.py           # أداة تحميل Chromium تلقائي
+│   ├── downloader.py         # تحميل الحلقات (خلفية + متزامن)
 │   ├── ui/
 │   │   ├── __init__.py       # تصديرات واجهة المستخدم
-│   │   ├── tui.py            # الواجهة التفاعلية (Rich، ~2450 سطر)
+│   │   ├── tui.py            # الواجهة التفاعلية (Rich، ~2470 سطر)
 │   │   └── cli.py            # نقطة الدخول وتحليل وسائط سطر الأوامر
 │   ├── providers/
 │   │   ├── __init__.py       # سجل المزوّدين
 │   │   ├── _cookies.py       # استخراج الكوكيز من المتصفح
-│   │   ├── _utils.py         # أدوات مساعدة مشتركة (التحقق من الروابط، تصنيف الجودة)
+│   │   ├── _utils.py         # أدوات مساعدة (التحقق من الروابط، حماية SSRF، تصنيف الجودة)
 │   │   ├── _scraper.py       # منطق الاستخراج المشترك (httpx + Playwright)
 │   │   ├── witanime.py       # مزود WitAnime
-│   │   ├── anineko.py        # مزود Anineko
+│   │   ├── anineko.py        # مزود Anineko / Gogoanime
 │   │   └── anime3rb.py       # مزود Anime3rb
 │   ├── playback/
 │   │   ├── __init__.py       # واجهة التشغيل
 │   │   ├── discovery.py      # كشف المشغلات (VLC, MPV, IINA...)
-│   │   ├── launch.py         # تشغيل مشغل الفيديو
-│   │   └── progress.py       # تتبع تقدّم التشغيل
+│   │   ├── launch.py         # تشغيل مشغل الفيديو (مع استئناف التشغيل)
+│   │   └── progress.py       # تتبع تقدّم التشغيل عبر IPC (مع debounce)
 │   ├── cache/
 │   │   ├── __init__.py       # واجهة التخزين المؤقت
-│   │   └── stream_cache.py   # تخزين روابط البث (SQLite)
+│   │   └── stream_cache.py   # تخزين روابط البث (SQLite، بدون تسريب اتصال)
 │   ├── config/
 │   │   └── __init__.py       # إعدادات، سمات، أيقونات
 │   └── db/
-│       └── __init__.py       # قاعدة البيانات: حسابات، مفضلة، سجل، تحميلات
+│       └── __init__.py       # قاعدة البيانات: حسابات، مفضلة، تقدّم، تحميلات
+├── tests/
+│   ├── conftest.py           # أدوات مساعدة للاختبار (مجلد مؤقت، DB نظيفة)
+│   ├── test_cache.py         # 5 اختبارات: cache CRUD + انتهاء الصلاحية
+│   ├── test_config.py        # 10 اختبارات: حفظ/تحميل الإعدادات، الأيقونات، المزوّدين
+│   ├── test_db.py            # 18 اختبار: تقدّم، مفضلة، تحميلات، حسابات، دمج
+│   ├── test_playback.py      # 9 اختبارات: كشف المشغلات (مع shutil.mock)
+│   └── test_utils.py         # 14 اختبار: URL، SSRF، استخراج slug، جودة
+├── AGENTS.md                 # سياق مساعد الذكاء الاصطناعي (opencode)
 ├── requirements.txt          # تبعيات Python
 ├── pyproject.toml            # بيانات المشروع (PEP 621)
 ├── setup.py                  # بناء Cython قديم (مهمل — استخدم build/build.py)

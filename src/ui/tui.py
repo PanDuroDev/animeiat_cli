@@ -2,6 +2,7 @@
 TUI components for animeiat-cli — interactive terminal UI, state machine, and widgets.
 """
 import asyncio
+import sqlite3
 
 _shared_loop = asyncio.new_event_loop()
 asyncio.set_event_loop(_shared_loop)
@@ -44,7 +45,7 @@ from src.db import (
     save_account_token, get_account_token, remove_account,
     fetch_anime_metadata,
     fetch_anilist_user_list, fetch_mal_user_list,
-    get_all_episode_progress,
+    get_all_episode_progress, get_all_favorites,
     add_download_entry, get_downloads, remove_download_entry, update_download_status,
 )
 from src.downloader import enqueue_selected
@@ -1280,7 +1281,7 @@ def _handle_main_menu(current, stack, ctx):
         cursor.execute("SELECT COUNT(*) FROM favorites")
         fav_count = cursor.fetchone()[0]
         conn.close()
-    except Exception as e:
+    except sqlite3.Error as e:
         print(f"[animeiat-cli] Warning: favorites count DB query failed: {e}")
     update_info = check_for_update(APP_VERSION)
     menu_metadata = {
@@ -1590,16 +1591,7 @@ def _handle_url_input(current, stack, ctx):
 
 
 def _handle_favorites(current, stack, ctx):
-    favs = []
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT slug, title, url, is_witanime FROM favorites")
-        for row in cursor.fetchall():
-            favs.append({"slug": row[0], "title": row[1], "url": row[2], "is_witanime": int(row[3])})
-        conn.close()
-    except Exception as e:
-        print(f"[animeiat-cli] Warning: favorites DB query failed: {e}")
+    favs = get_all_favorites()
     if not favs:
         _centered_message("No favorites bookmarked yet.", level="warn")
         stack.pop()
@@ -1860,7 +1852,7 @@ def _settings_data_sync(cfg, stack):
                 cursor.execute("DELETE FROM accounts")
                 conn.commit()
                 conn.close()
-            except Exception as e:
+            except sqlite3.Error as e:
                 print(f"[animeiat-cli] Warning: DB cleanup failed: {e}")
             cfg["history"] = {}
             cfg["favorites"] = []
@@ -2194,33 +2186,29 @@ def _handle_export():
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        cursor.execute("SELECT slug, last_watched FROM shows ORDER BY slug")
-        shows = cursor.fetchall()
-
-        cursor.execute("SELECT slug, episode FROM watched_episodes ORDER BY slug, episode")
-        watched = cursor.fetchall()
-
-        cursor.execute("SELECT slug, episode, time_pos, duration FROM episode_progress ORDER BY slug, episode")
+        cursor.execute("SELECT slug, episode, time_pos, duration, provider FROM episode_progress ORDER BY slug, episode")
         progress = cursor.fetchall()
 
         conn.close()
-    except Exception as e:
+    except sqlite3.Error as e:
         _centered_message(f"Database read error: {e}", level="error")
         return
+
+    shows = {}
+    watched = {}
+    prog_dict = {}
+    for slug, ep, tp, dur, _prov in progress:
+        shows[slug] = max(shows.get(slug, 0), ep)
+        watched.setdefault(slug, []).append(ep)
+        prog_dict.setdefault(slug, []).append({"episode": ep, "time_pos": tp, "duration": dur})
 
     data = {
         "exported_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "version": APP_VERSION,
-        "shows": {slug: {"last_watched": lw} for slug, lw in shows},
-        "watched_episodes": {slug: [] for slug, _ in shows},
-        "episode_progress": {},
+        "shows": {k: {"last_watched": v} for k, v in shows.items()},
+        "watched_episodes": watched,
+        "episode_progress": prog_dict,
     }
-
-    for slug, ep in watched:
-        data["watched_episodes"].setdefault(slug, []).append(ep)
-
-    for slug, ep, tp, dur in progress:
-        data["episode_progress"].setdefault(slug, []).append({"episode": ep, "time_pos": tp, "duration": dur})
 
     export_dir = get_config_dir()
     ts = time.strftime("%Y%m%d_%H%M%S")
@@ -2316,43 +2304,47 @@ def _handle_continue_watching(current, stack, ctx):
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT DISTINCT s.slug, s.last_watched
-            FROM shows s
-            ORDER BY s.last_watched DESC
+            SELECT slug, MAX(episode) as last_watched, provider
+            FROM episode_progress
+            GROUP BY slug, provider
+            ORDER BY MAX(episode) DESC
             LIMIT 50
         """)
         rows = cursor.fetchall()
         conn.close()
-    except Exception as e:
+    except sqlite3.Error as e:
         print(f"[animeiat-cli] Warning: continue watching query failed: {e}")
         rows = []
     if not rows:
         _centered_message("No watch history found. Watch some episodes first!", level="info")
         stack.pop()
         return True
+    _PROVIDER_URL_PATTERNS = [
+        "https://anime3rb.com/titles/{slug}",
+        "https://witanime.bond/anime/{slug}",
+        "https://anitaku.to/category/{slug}",
+        "https://hianime.to/watch/{slug}",
+        "https://9anime.to/watch/{slug}",
+    ]
     items = []
-    for slug_key, last_watched in rows:
-        bare_slug = slug_key.rsplit("_", 1)[0]
-        provider = 0
-        try:
-            prov = int(slug_key.rsplit("_", 1)[1])
-            provider = prov
-        except (ValueError, IndexError):
-            pass
-        title = bare_slug
+    for slug, last_watched, provider in rows:
+        title = slug
         anime_url = ""
         try:
             conn = get_db_connection()
             c = conn.cursor()
-            c.execute("SELECT title, url FROM favorites WHERE slug = ?", (bare_slug,))
+            c.execute("SELECT title, url FROM favorites WHERE slug = ?", (slug,))
             fav_row = c.fetchone()
             if fav_row:
-                title = fav_row[0] if fav_row[0] else bare_slug
+                title = fav_row[0] if fav_row[0] else slug
                 anime_url = fav_row[1] if fav_row[1] else ""
             conn.close()
         except Exception as e:
             print(f"[animeiat-cli] Warning: continue watching fav lookup failed: {e}")
-        items.append({"slug": bare_slug, "title": title, "url": anime_url, "is_witanime": provider, "last_watched": last_watched})
+        if not anime_url and 0 <= provider < len(_PROVIDER_URL_PATTERNS):
+            anime_url = _PROVIDER_URL_PATTERNS[provider].format(slug=slug)
+        if anime_url:
+            items.append({"slug": slug, "title": title, "url": anime_url, "is_witanime": provider, "last_watched": last_watched})
     if not items:
         _centered_message("No watch history found. Watch some episodes first!", level="info")
         stack.pop()

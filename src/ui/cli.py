@@ -96,9 +96,10 @@ def run_noninteractive(initial_url, player_override=None, quality_override=None,
     if quality_override:
         _config_cache["default_quality"] = quality_override
 
-    eps_to_scrape = [eps[0]]
+    eps_to_scrape = eps if download_mode else [eps[0]]
     if not json_output:
-        print(f"Scraping stream URL for episode {eps[0]['episode']}...")
+        msg = f"Scraping stream URLs for {len(eps_to_scrape)} episode(s)..."
+        print(msg)
     try:
         results = asyncio.run(scrape_multiple_streams_async(eps_to_scrape, is_witanime, active_cookies))
     except KeyboardInterrupt:

@@ -10,6 +10,8 @@ A terminal application for searching and playing anime episodes from multiple we
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue?style=for-the-badge)
 ![Platform](https://img.shields.io/badge/platform-windows%20%7C%20macos%20%7C%20linux-lightgrey?style=for-the-badge)
 [![Latest Release](https://img.shields.io/github/v/release/PanDuroDev/animeiat_cli?style=for-the-badge)](https://github.com/PanDuroDev/animeiat_cli/releases)
+[![Tests](https://img.shields.io/badge/tests-71%20passing-brightgreen?style=for-the-badge)](https://github.com/PanDuroDev/animeiat_cli/actions)
+[![Issues](https://img.shields.io/badge/issues-0%20open-success?style=for-the-badge)](https://github.com/PanDuroDev/animeiat_cli/issues)
 
 ## Table of Contents
 
@@ -40,11 +42,11 @@ animeiat-cli is a program that runs in your terminal (command prompt) and lets y
 
 Key capabilities:
 
-- Search anime by name across multiple source websites.
-- Browse episode lists with keyboard navigation.
-- Play episodes directly in VLC, MPV, or another installed media player.
-- Pick up where you left off — watch history is saved locally.
-- Bookmark shows as favorites or download episodes for offline viewing.
+- Search anime by name across 5 source websites (Anime3rb, WitAnime, Anineko/Gogoanime, HiAnime, 9anime).
+- Browse episode lists with keyboard navigation (filter, sort, detail panel).
+- Play episodes directly in VLC, MPV, IINA, Celluloid, or Haruna.
+- Pick up where you left off — watch history + per-episode playback progress saved locally.
+- Bookmark shows as favorites or batch-download episodes for offline viewing.
 - All data stays on your machine. No account required.
 
 ### Before You Start
@@ -122,7 +124,7 @@ docker run -it animeiat-cli
 
 ### How to Use It
 
-Run `python anime_cli.py` to start the interactive TUI (Terminal User Interface).
+Run `animeiat-cli` (or `python -m src.ui.cli`) to start the interactive TUI (Terminal User Interface).
 
 The main menu shows these options:
 
@@ -142,16 +144,16 @@ You can also use the app without the TUI:
 
 ```bash
 # Play a specific URL directly
-python anime_cli.py --url https://example.com/anime/... --no-tui
+animeiat-cli --url https://anime3rb.com/titles/naruto --no-tui
 
-# List episodes as JSON
-python anime_cli.py --url https://... --list-episodes --json
+# List episodes as JSON (batch download with --download)
+animeiat-cli --url https://... --list-episodes --json
 
-# Queue an episode for download
-python anime_cli.py --url https://... --download
+# Queue ALL episodes for batch download
+animeiat-cli --url https://... --download
 
 # Show version
-python anime_cli.py --version
+animeiat-cli --version
 ```
 
 ### Troubleshooting
@@ -339,30 +341,39 @@ animeiat-cli/
 ├── src/
 │   ├── __init__.py
 │   ├── chromium.py           # Chromium auto-install helper
+│   ├── downloader.py         # Download worker (background + blocking modes)
 │   ├── ui/
 │   │   ├── __init__.py       # UI exports
-│   │   ├── tui.py            # Interactive TUI (Rich-based, ~2450 lines)
+│   │   ├── tui.py            # Interactive TUI (Rich-based, ~2470 lines)
 │   │   └── cli.py            # CLI entry point & argument parsing
 │   ├── providers/
 │   │   ├── __init__.py       # Provider registry
 │   │   ├── _cookies.py       # Browser cookie extraction
-│   │   ├── _utils.py         # Shared helpers (URL validation, quality classification)
+│   │   ├── _utils.py         # Shared helpers (URL validation, SSRF guard, quality classification)
 │   │   ├── _scraper.py       # Shared scraping logic (httpx + Playwright)
 │   │   ├── witanime.py       # WitAnime provider
-│   │   ├── anineko.py        # Anineko provider
+│   │   ├── anineko.py        # Anineko / Gogoanime provider
 │   │   └── anime3rb.py       # Anime3rb provider
 │   ├── playback/
 │   │   ├── __init__.py       # Playback interface
 │   │   ├── discovery.py      # Player detection (VLC, MPV, IINA, etc.)
-│   │   ├── launch.py         # Player process launch
-│   │   └── progress.py       # Playback progress polling via IPC
+│   │   ├── launch.py         # Player process launch (resume-safe)
+│   │   └── progress.py       # Playback progress polling via IPC (debounced)
 │   ├── cache/
 │   │   ├── __init__.py       # Cache interface
-│   │   └── stream_cache.py   # SQLite-backed stream URL cache
+│   │   └── stream_cache.py   # SQLite-backed stream URL cache (leak-free)
 │   ├── config/
 │   │   └── __init__.py       # Config read/write, theme, icons
 │   └── db/
-│       └── __init__.py       # SQLite DB: accounts, favorites, history, downloads
+│       └── __init__.py       # SQLite DB: accounts, favorites, progress, downloads
+├── tests/
+│   ├── conftest.py           # Shared fixtures (temp dir, clean DB)
+│   ├── test_cache.py         # 5 tests: stream cache CRUD + expiry
+│   ├── test_config.py        # 10 tests: config load/save, icons, providers
+│   ├── test_db.py            # 18 tests: progress, favorites, downloads, accounts, merge
+│   ├── test_playback.py      # 9 tests: player discovery (mocked shutil)
+│   └── test_utils.py         # 14 tests: URL validation, SSRF, slug extraction, quality
+├── AGENTS.md                 # AI coding assistant context (opencode)
 ├── requirements.txt          # Python package dependencies
 ├── pyproject.toml            # Project metadata (PEP 621)
 ├── setup.py                  # Legacy Cython build (deprecated — use build/build.py)
