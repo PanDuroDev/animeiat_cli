@@ -60,7 +60,7 @@ from src.playback.launch import (
 )
 from src.playback.progress import stop_progress_tracking
 from src.playback.discovery import _invalidate_player_cfg as invalidate_player_cfg
-from src.providers._utils import validate_url, extract_slug
+from src.providers._utils import validate_url, extract_slug, detect_provider_from_url
 from src.providers._cookies import get_preferred_cookies
 from src.providers._scraper import fetch_episodes_list_async, scrape_multiple_streams_async
 from src.providers import registry as provider_registry, search_providers_for_media
@@ -1469,15 +1469,6 @@ def _handle_search_results(current, stack, ctx):
     return True
 
 
-def _detect_provider_from_url(url):
-    p = urlparse(url)
-    if "witanime" in p.netloc:
-        return 1
-    if "anitaku" in p.netloc or "gogoanime" in p.netloc or "anineko" in p.netloc:
-        return 2
-    return 0
-
-
 def _handle_url_input(current, stack, ctx):
     anime_url = current.get("prefilled_url") or _centered_prompt("Enter Anime URL (or press Enter/Esc to go back)")
     if not anime_url:
@@ -1489,7 +1480,7 @@ def _handle_url_input(current, stack, ctx):
         return True
     anime_url = anime_url.strip()
     p = urlparse(anime_url)
-    is_witanime = _detect_provider_from_url(anime_url)
+    is_witanime = detect_provider_from_url(anime_url)
 
     if 'search_param=animes' in p.query:
         from urllib.parse import parse_qs
@@ -2172,13 +2163,13 @@ def _handle_episode_selection(current, stack, ctx):
         if player_name == "MPV":
             launch_success = play_with_mpv(stream_urls, slug=slug, ep=eps_to_scrape[0]["episode"], extra_args=track_args, provider=is_witanime)
         elif player_name == "VLC":
-            launch_success = play_with_vlc(stream_urls, extra_args=track_args)
+            launch_success = play_with_vlc(stream_urls, extra_args=track_args, slug=slug, ep=eps_to_scrape[0]["episode"], provider=is_witanime)
         elif player_name == "IINA":
-            launch_success = play_with_iina(stream_urls, extra_args=track_args)
+            launch_success = play_with_iina(stream_urls, extra_args=track_args, slug=slug, ep=eps_to_scrape[0]["episode"], provider=is_witanime)
         elif player_name == "Celluloid":
-            launch_success = play_with_celluloid(stream_urls, extra_args=track_args)
+            launch_success = play_with_celluloid(stream_urls, extra_args=track_args, slug=slug, ep=eps_to_scrape[0]["episode"], provider=is_witanime)
         elif player_name == "Haruna":
-            launch_success = play_with_haruna(stream_urls, extra_args=track_args)
+            launch_success = play_with_haruna(stream_urls, extra_args=track_args, slug=slug, ep=eps_to_scrape[0]["episode"], provider=is_witanime)
         if launch_success:
             for ep_num in ep_numbers:
                 add_watch_history(slug, ep_num, anime_title, provider=is_witanime)

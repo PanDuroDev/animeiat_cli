@@ -4,6 +4,31 @@ from urllib.parse import urlparse
 from src.config import load_config, THEME
 
 
+def detect_provider_from_url(url):
+    p = urlparse(url.strip())
+    netloc = p.netloc.lower()
+    domain = netloc.split(":")[0]
+    for pattern, provider_id in [
+        ("anime3rb.com", 0), ("www.anime3rb.com", 0),
+        ("witanime.bond", 1), ("www.witanime.bond", 1),
+        ("anitaku.to", 2), ("www.anitaku.to", 2),
+        ("gogoanime.cl", 2), ("gogoanime.bz", 2),
+        ("anineko.to", 2), ("www.anineko.to", 2),
+        ("hianime.to", 3), ("www.hianime.to", 3),
+        ("9anime.to", 4), ("www.9anime.to", 4),
+    ]:
+        if domain == pattern:
+            return provider_id
+    for pattern, provider_id in [
+        ("anime3rb", 0), ("witanime", 1),
+        ("anitaku", 2), ("gogoanime", 2), ("anineko", 2),
+        ("hianime", 3), ("9anime", 4),
+    ]:
+        if pattern in netloc:
+            return provider_id
+    return 0
+
+
 def validate_url(url):
     if not url or not url.strip():
         return False, "URL is empty"

@@ -28,7 +28,7 @@ from src.playback.launch import (
     play_with_vlc, play_with_mpv, play_with_iina,
     play_with_celluloid, play_with_haruna,
 )
-from src.providers._utils import validate_url, extract_slug
+from src.providers._utils import validate_url, extract_slug, detect_provider_from_url
 from src.providers._cookies import get_preferred_cookies
 from src.providers._scraper import fetch_episodes_list_async, scrape_multiple_streams_async
 
@@ -61,7 +61,7 @@ def run_noninteractive(initial_url, player_override=None, quality_override=None,
 
     anime_url = initial_url.strip()
     p = urlparse(anime_url)
-    is_witanime = 1 if "witanime" in p.netloc else 2 if "anitaku" in p.netloc or "gogoanime" in p.netloc or "anineko" in p.netloc else 0
+    is_witanime = detect_provider_from_url(anime_url)
     slug = extract_slug(anime_url)
     if not slug:
         _emit({"error": f"Could not extract slug from URL: {anime_url}", "success": False}, exit_code=1)
@@ -183,13 +183,13 @@ def run_noninteractive(initial_url, player_override=None, quality_override=None,
     if player_name == "MPV":
         launch_success = play_with_mpv(stream_urls, slug=slug, ep=eps_to_scrape[0]["episode"], provider=is_witanime)
     elif player_name == "VLC":
-        launch_success = play_with_vlc(stream_urls)
+        launch_success = play_with_vlc(stream_urls, slug=slug, ep=eps_to_scrape[0]["episode"], provider=is_witanime)
     elif player_name == "IINA":
-        launch_success = play_with_iina(stream_urls)
+        launch_success = play_with_iina(stream_urls, slug=slug, ep=eps_to_scrape[0]["episode"], provider=is_witanime)
     elif player_name == "Celluloid":
-        launch_success = play_with_celluloid(stream_urls)
+        launch_success = play_with_celluloid(stream_urls, slug=slug, ep=eps_to_scrape[0]["episode"], provider=is_witanime)
     elif player_name == "Haruna":
-        launch_success = play_with_haruna(stream_urls)
+        launch_success = play_with_haruna(stream_urls, slug=slug, ep=eps_to_scrape[0]["episode"], provider=is_witanime)
 
     if launch_success:
         if not json_output:
