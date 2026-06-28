@@ -15,13 +15,13 @@ def stop_progress_tracking():
     _stop_event.set()
 
 
-def start_progress_tracking(slug, episode, player_ipc_path):
-    stop_progress_tracking()  # stop any previous zombie thread
+def start_progress_tracking(slug, episode, player_ipc_path, provider=0):
+    stop_progress_tracking()
     _stop_event.clear()
-    threading.Thread(target=poll_mpv_progress, args=(player_ipc_path, slug, episode), daemon=True).start()
+    threading.Thread(target=poll_mpv_progress, args=(player_ipc_path, slug, episode, provider), daemon=True).start()
 
 
-def poll_mpv_progress(ipc_path, slug, ep):
+def poll_mpv_progress(ipc_path, slug, ep, provider=0):
     client = None
     for _ in range(20):
         if _stop_event.is_set():
@@ -131,9 +131,9 @@ def poll_mpv_progress(ipc_path, slug, ep):
 
             if time_pos is not None:
                 if duration and (time_pos / duration > 0.95):
-                    save_episode_progress(slug, ep, 0, duration)
+                    save_episode_progress(slug, ep, 0, duration, provider=provider)
                 else:
-                    save_episode_progress(slug, ep, time_pos, duration or 0)
+                    save_episode_progress(slug, ep, time_pos, duration or 0, provider=provider)
 
             _stop_event.wait(1.0)
     except Exception as e:

@@ -181,7 +181,7 @@ def run_noninteractive(initial_url, player_override=None, quality_override=None,
 
     launch_success = False
     if player_name == "MPV":
-        launch_success = play_with_mpv(stream_urls, slug=slug, ep=eps_to_scrape[0]["episode"])
+        launch_success = play_with_mpv(stream_urls, slug=slug, ep=eps_to_scrape[0]["episode"], provider=is_witanime)
     elif player_name == "VLC":
         launch_success = play_with_vlc(stream_urls)
     elif player_name == "IINA":

@@ -2009,7 +2009,7 @@ def _handle_episode_selection(current, stack, ctx):
     default_idx = 0
     if last_watched_idx != -1:
         default_idx = last_watched_idx + 1 if last_watched_idx + 1 < len(eps) else last_watched_idx
-    progress_data = get_all_episode_progress(slug)
+    progress_data = get_all_episode_progress(slug, provider=is_witanime)
     ep_options = []
     for x in eps:
         ep_num = x['episode']
@@ -2170,7 +2170,7 @@ def _handle_episode_selection(current, stack, ctx):
                 track_args.append(f":sub-track={track_info['sub_id']}")
         _centered_message(f"Launching {player_name} with {len(stream_urls)} stream(s)...", level="info")
         if player_name == "MPV":
-            launch_success = play_with_mpv(stream_urls, slug=slug, ep=eps_to_scrape[0]["episode"], extra_args=track_args)
+            launch_success = play_with_mpv(stream_urls, slug=slug, ep=eps_to_scrape[0]["episode"], extra_args=track_args, provider=is_witanime)
         elif player_name == "VLC":
             launch_success = play_with_vlc(stream_urls, extra_args=track_args)
         elif player_name == "IINA":

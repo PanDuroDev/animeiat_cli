@@ -84,9 +84,11 @@ def init_db():
                 episode INTEGER,
                 time_pos REAL,
                 duration REAL,
-                PRIMARY KEY (slug, episode)
+                provider INTEGER DEFAULT 0,
+                PRIMARY KEY (slug, episode, provider)
             )
         """)
+        _migrate_episode_progress_schema(cursor)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS accounts (
                 platform TEXT PRIMARY KEY,
@@ -132,6 +134,31 @@ def _migrate_old_db():
                     os.remove(new_db)
                 except Exception as e2:
                     print(f"[animeiat-cli] Warning: failed to remove corrupt new DB: {e2}")
+
+
+def _migrate_episode_progress_schema(cursor):
+    try:
+        cursor.execute("PRAGMA table_info(episode_progress)")
+        columns = {r[1] for r in cursor.fetchall()}
+        if "provider" not in columns:
+            cursor.execute("ALTER TABLE episode_progress RENAME TO episode_progress_old")
+            cursor.execute("""
+                CREATE TABLE episode_progress (
+                    slug TEXT,
+                    episode INTEGER,
+                    time_pos REAL,
+                    duration REAL,
+                    provider INTEGER DEFAULT 0,
+                    PRIMARY KEY (slug, episode, provider)
+                )
+            """)
+            cursor.execute("""
+                INSERT INTO episode_progress (slug, episode, time_pos, duration, provider)
+                SELECT slug, episode, time_pos, duration, 0 FROM episode_progress_old
+            """)
+            cursor.execute("DROP TABLE episode_progress_old")
+    except Exception as e:
+        print(f"[animeiat-cli] Warning: episode_progress schema migration failed: {e}")
 
 
 def migrate_json_to_sqlite():
@@ -185,13 +212,13 @@ def migrate_json_to_sqlite():
         print(f"[animeiat-cli] Warning: config migration failed: {e}")
 
 
-def save_episode_progress(slug, ep, time_pos, duration):
+def save_episode_progress(slug, ep, time_pos, duration, provider=0):
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute(
-            "INSERT OR REPLACE INTO episode_progress (slug, episode, time_pos, duration) VALUES (?, ?, ?, ?)",
-            (slug, ep, time_pos, duration)
+            "INSERT OR REPLACE INTO episode_progress (slug, episode, time_pos, duration, provider) VALUES (?, ?, ?, ?, ?)",
+            (slug, ep, time_pos, duration, provider)
         )
         conn.commit()
         conn.close()
@@ -199,13 +226,13 @@ def save_episode_progress(slug, ep, time_pos, duration):
         print(f"[animeiat-cli] Warning: save_episode_progress failed: {e}")
 
 
-def get_episode_progress(slug, ep):
+def get_episode_progress(slug, ep, provider=0):
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT time_pos, duration FROM episode_progress WHERE slug = ? AND episode = ?",
-            (slug, ep)
+            "SELECT time_pos, duration FROM episode_progress WHERE slug = ? AND episode = ? AND provider = ?",
+            (slug, ep, provider)
         )
         row = cursor.fetchone()
         conn.close()
@@ -252,13 +279,13 @@ def is_favorite_slug(slug):
         return False
 
 
-def get_all_episode_progress(slug):
+def get_all_episode_progress(slug, provider=0):
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT episode, time_pos, duration FROM episode_progress WHERE slug = ?",
-            (slug,)
+            "SELECT episode, time_pos, duration FROM episode_progress WHERE slug = ? AND provider = ?",
+            (slug, provider)
         )
         rows = cursor.fetchall()
         conn.close()

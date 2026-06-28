@@ -44,7 +44,7 @@ def play_with_vlc(stream_urls, extra_args=None):
         return False
 
 
-def play_with_mpv(stream_urls, slug=None, ep=None, extra_args=None):
+def play_with_mpv(stream_urls, slug=None, ep=None, extra_args=None, provider=0):
     mpv_path = get_cached_players().get("mpv")
     if not mpv_path:
         return False
@@ -66,7 +66,7 @@ def play_with_mpv(stream_urls, slug=None, ep=None, extra_args=None):
             ipc_path = f"/tmp/animeiat-cli-ipc-{slug}-{ep}.sock"
         fs_arg.append(f"--input-ipc-server={ipc_path}")
 
-        prog = get_episode_progress(slug, ep)
+        prog = get_episode_progress(slug, ep, provider=provider)
         if prog and prog.get("time_pos", 0) > 5:
             fs_arg.append(f"--start={int(prog['time_pos'])}")
 
@@ -82,7 +82,7 @@ def play_with_mpv(stream_urls, slug=None, ep=None, extra_args=None):
             subprocess.Popen(cmd, start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
         if ipc_path:
-            start_progress_tracking(slug, ep, ipc_path)
+            start_progress_tracking(slug, ep, ipc_path, provider=provider)
 
         return True
     except Exception as e:
