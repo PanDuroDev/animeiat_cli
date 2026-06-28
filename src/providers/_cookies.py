@@ -10,6 +10,7 @@ import tempfile
 from src.config import load_config
 
 _cookie_warn_count = {}
+_key_cache = {}
 
 def _cookie_warn(msg):
     _cookie_warn_count[msg] = _cookie_warn_count.get(msg, 0) + 1
@@ -121,6 +122,11 @@ def decrypt_cbc_cookie(encrypted_value, key):
 
 
 def get_browser_cookies(browser_name):
+    cached = _key_cache.get(browser_name)
+    if cached:
+        decrypted_key, is_gcm = cached
+        return _read_cookies(browser_name, decrypted_key, is_gcm)
+
     user_data_path = get_user_data_path(browser_name)
     if not user_data_path or not os.path.exists(user_data_path):
         return []
@@ -164,8 +170,19 @@ def get_browser_cookies(browser_name):
         if not decrypted_key:
             return []
 
+    _key_cache[browser_name] = (decrypted_key, is_gcm)
+    return _read_cookies(user_data_path, decrypted_key, is_gcm)
+
+
+def _read_cookies(user_data_path, decrypted_key, is_gcm):
     cookies = {}
     profiles = ["Default", "Profile 1", "Profile 2", "Profile 3", "Profile 4", "Profile 5"]
+    win32crypt = None
+    if os.name == 'nt':
+        try:
+            import win32crypt
+        except ImportError:
+            pass
 
     try:
         for item in os.listdir(user_data_path):
