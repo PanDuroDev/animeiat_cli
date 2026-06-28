@@ -2224,9 +2224,9 @@ def _handle_export():
         with open(fpath, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
             writer.writerow(["slug", "field", "episode", "value"])
-            for slug, lw in shows:
+            for slug, lw in shows.items():
                 writer.writerow([slug, "last_watched", "", lw])
-            for slug, ep in watched:
+            for slug, ep in watched.items():
                 writer.writerow([slug, "watched", ep, ""])
             for slug, ep, tp, dur in progress:
                 writer.writerow([slug, "progress", ep, f"{tp}/{dur}"])
