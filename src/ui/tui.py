@@ -1042,6 +1042,7 @@ def interactive_priority_list(labels, current_order):
     try:
         def make_panel():
             nonlocal scroll_offset, _notify
+            width, height = shutil.get_terminal_size()
             if selected_idx < scroll_offset:
                 scroll_offset = selected_idx
             elif selected_idx >= scroll_offset + max_visible:
@@ -1077,9 +1078,9 @@ def interactive_priority_list(labels, current_order):
                 _notify = ""
             table.add_row("")
 
-            subtitle = f"\u2191\u2195 Navigate  u=Up(d) d=Down priority  \u23ce Confirm  Esc Cancel"
+            subtitle = f"Navigate: \u2191\u2195  Move: u=up d=down  Confirm: Enter  Cancel: Esc"
 
-            left_panel = Panel(
+            panel = Panel(
                 table,
                 title=f"[bold {THEME['primary']}] Search Source Priorities [/bold {THEME['primary']}]",
                 subtitle=f"[{THEME['fg']}]{subtitle}  ({selected_idx + 1}/{len(order)})[/{THEME['fg']}]",
@@ -1089,8 +1090,7 @@ def interactive_priority_list(labels, current_order):
                 padding=(1, 2)
             )
 
-            renderable = Group(left_panel)
-            return renderable
+            return Align(panel, align="center", vertical="middle", height=height)
 
         live = Live(
             make_panel(),
@@ -1492,7 +1492,7 @@ def _handle_search_input(current, stack, ctx):
         try:
             from src.providers import search_all_providers as _search_all
             from src.config import PROVIDER_IDS as _PID
-            raw = _run_async(_search_all(query, priorities=priorities))
+            raw = _run_async(_search_all(query, provider_ids=priorities, priorities=priorities))
             search_results = []
             seen = set()
             for pid, items in raw.items():
@@ -1645,7 +1645,7 @@ def _handle_url_input(current, stack, ctx):
                     priorities = cfg_s.get("search_priorities", [0, 1, 2])
                     from src.providers import search_all_providers as _search_all
                     from src.config import PROVIDER_IDS as _PID
-                    raw = _run_async(_search_all(search_query, priorities=priorities))
+                    raw = _run_async(_search_all(search_query, provider_ids=priorities, priorities=priorities))
                     search_results = []
                     seen = set()
                     for pid, items in raw.items():

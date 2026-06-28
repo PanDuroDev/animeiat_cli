@@ -23,7 +23,8 @@ def start_progress_tracking(slug, episode, player_ipc_path, provider=0):
 
 def poll_mpv_progress(ipc_path, slug, ep, provider=0):
     client = None
-    for _ in range(20):
+    max_retries = 8
+    for retry in range(max_retries):
         if _stop_event.is_set():
             return
         if os.name == 'nt':
@@ -31,7 +32,8 @@ def poll_mpv_progress(ipc_path, slug, ep, provider=0):
                 client = open(ipc_path, "r+b", buffering=0)
                 break
             except Exception as e:
-                print(f"[animeiat-cli] Warning: IPC connect attempt failed: {e}")
+                if retry == 0:
+                    print(f"[animeiat-cli] Warning: IPC connect attempt failed: {e}")
                 time.sleep(0.3)
         else:
             if os.path.exists(ipc_path):
@@ -75,7 +77,8 @@ def poll_mpv_progress(ipc_path, slug, ep, provider=0):
                         if resp.get("error") == "success":
                             time_pos = resp.get("data")
                 except Exception as e:
-                    print(f"[animeiat-cli] Warning: IPC time-pos read failed: {e}")
+                    if "Invalid argument" not in str(e):
+                        print(f"[animeiat-cli] Warning: IPC time-pos read failed: {e}")
                     break
 
                 try:
@@ -93,7 +96,8 @@ def poll_mpv_progress(ipc_path, slug, ep, provider=0):
                         if resp.get("error") == "success":
                             duration = resp.get("data")
                 except Exception as e:
-                    print(f"[animeiat-cli] Warning: IPC duration read failed: {e}")
+                    if "Invalid argument" not in str(e):
+                        print(f"[animeiat-cli] Warning: IPC duration read failed: {e}")
                     break
             else:
                 try:
