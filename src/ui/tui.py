@@ -1550,6 +1550,8 @@ def _handle_url_input(current, stack, ctx):
                     slug = part
                     break
             if not slug:
+                slug = extract_slug(anime_url)
+            if not slug:
                 slug = path_parts[-2] if len(path_parts) >= 2 else path_parts[-1]
         if not slug:
             _centered_message(f"Could not extract slug from URL: {anime_url}.", level="error")
