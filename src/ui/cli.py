@@ -52,19 +52,18 @@ def run_noninteractive(initial_url, player_override=None, quality_override=None,
             for k, v in data_dict.items():
                 if v is not None:
                     print(f"{k}: {v}")
-        if exit_code is not None:
-            sys.exit(exit_code)
+        return exit_code
 
     valid, err_msg = validate_url(initial_url)
     if not valid:
-        _emit({"error": f"Invalid URL \u2014 {err_msg}", "success": False}, exit_code=1)
+        sys.exit(_emit({"error": f"Invalid URL \u2014 {err_msg}", "success": False}, exit_code=1))
 
     anime_url = initial_url.strip()
     p = urlparse(anime_url)
     is_witanime = detect_provider_from_url(anime_url)
     slug = extract_slug(anime_url)
     if not slug:
-        _emit({"error": f"Could not extract slug from URL: {anime_url}", "success": False}, exit_code=1)
+        sys.exit(_emit({"error": f"Could not extract slug from URL: {anime_url}", "success": False}, exit_code=1))
 
     if not json_output:
         print(f"Anime: {slug}")
@@ -78,17 +77,17 @@ def run_noninteractive(initial_url, player_override=None, quality_override=None,
     try:
         eps, err = asyncio.run(fetch_episodes_list_async(anime_url, is_witanime, active_cookies))
     except Exception as exc:
-        _emit({"error": f"Fetch failed: {exc}", "success": False}, exit_code=1)
+        sys.exit(_emit({"error": f"Fetch failed: {exc}", "success": False}, exit_code=1))
 
     if err:
-        _emit({"error": f"Fetch failed: {err}", "success": False}, exit_code=1)
+        sys.exit(_emit({"error": f"Fetch failed: {err}", "success": False}, exit_code=1))
 
     if not eps:
-        _emit({"error": "No episodes found.", "success": False}, exit_code=1)
+        sys.exit(_emit({"error": "No episodes found.", "success": False}, exit_code=1))
 
     if list_episodes:
         ep_list = [{"episode": e["episode"], "page_url": e.get("page_url", "")} for e in eps]
-        _emit({"slug": slug, "total_episodes": len(eps), "episodes": ep_list, "success": True}, exit_code=0)
+        sys.exit(_emit({"slug": slug, "total_episodes": len(eps), "episodes": ep_list, "success": True}, exit_code=0))
 
     if not json_output:
         print(f"  Found {len(eps)} episode(s).")
@@ -103,13 +102,13 @@ def run_noninteractive(initial_url, player_override=None, quality_override=None,
     try:
         results = asyncio.run(scrape_multiple_streams_async(eps_to_scrape, is_witanime, active_cookies))
     except KeyboardInterrupt:
-        _emit({"error": "Scraping cancelled.", "success": False}, exit_code=1)
+        sys.exit(_emit({"error": "Scraping cancelled.", "success": False}, exit_code=1))
     except Exception as exc:
-        _emit({"error": f"Scraping error: {exc}", "success": False}, exit_code=1)
+        sys.exit(_emit({"error": f"Scraping error: {exc}", "success": False}, exit_code=1))
 
     stream_urls = [results[ep["episode"]] for ep in eps_to_scrape if results.get(ep["episode"])]
     if not stream_urls:
-        _emit({"error": "No stream URLs resolved.", "success": False}, exit_code=1)
+        sys.exit(_emit({"error": "No stream URLs resolved.", "success": False}, exit_code=1))
 
     if download_mode:
         queued = 0
@@ -125,10 +124,10 @@ def run_noninteractive(initial_url, player_override=None, quality_override=None,
                     print(f"  Episode {ep_num} downloaded.")
                 else:
                     print(f"  Episode {ep_num} download failed.")
-        _emit({"slug": slug, "queued": queued, "mode": "download", "success": queued > 0}, exit_code=0 if queued > 0 else 1)
+        sys.exit(_emit({"slug": slug, "queued": queued, "mode": "download", "success": queued > 0}, exit_code=0 if queued > 0 else 1))
 
     if json_output:
-        _emit({"slug": slug, "episode": eps[0]["episode"], "stream_urls": stream_urls, "success": True, "mode": "stream"}, exit_code=0)
+        sys.exit(_emit({"slug": slug, "episode": eps[0]["episode"], "stream_urls": stream_urls, "success": True, "mode": "stream"}, exit_code=0))
 
     if not json_output:
         print(f"  Resolved {len(stream_urls)} stream URL(s).")
@@ -178,7 +177,7 @@ def run_noninteractive(initial_url, player_override=None, quality_override=None,
     if not player_name or player_name == "None":
         for s in stream_urls:
             print(f"  {s}")
-        _emit({"error": "No media player found.", "streams": stream_urls, "success": False}, exit_code=0)
+        sys.exit(_emit({"error": "No media player found.", "streams": stream_urls, "success": False}, exit_code=0))
 
     launch_success = False
     if player_name == "MPV":
@@ -197,11 +196,11 @@ def run_noninteractive(initial_url, player_override=None, quality_override=None,
             print(f"Playback started in {player_name} with {len(stream_urls)} stream(s).")
         for ep_num in [ep["episode"] for ep in eps_to_scrape]:
             add_watch_history(slug, ep_num, slug, provider=is_witanime)
-        _emit({"success": True, "player": player_name, "streams": len(stream_urls)}, exit_code=0)
+        sys.exit(_emit({"success": True, "player": player_name, "streams": len(stream_urls)}, exit_code=0))
     else:
         for s in stream_urls:
             print(f"  {s}")
-        _emit({"error": f"Failed to launch {player_name}.", "streams": stream_urls, "success": False}, exit_code=0)
+        sys.exit(_emit({"error": f"Failed to launch {player_name}.", "streams": stream_urls, "success": False}, exit_code=0))
 
 
 def main():

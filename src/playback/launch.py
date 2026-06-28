@@ -1,4 +1,5 @@
 import os
+import re
 import subprocess
 
 from .discovery import get_cached_players, _get_player_cfg
@@ -64,10 +65,11 @@ def play_with_mpv(stream_urls, slug=None, ep=None, extra_args=None, provider=0):
 
     ipc_path = None
     if slug and ep is not None:
+        safe_slug = re.sub(r'[\\/:*?"<>|]', '_', str(slug))
         if os.name == 'nt':
-            ipc_path = rf"\\.\pipe\animeiat-cli-ipc-{slug}-{ep}"
+            ipc_path = rf"\\.\pipe\animeiat-cli-ipc-{safe_slug}-{ep}"
         else:
-            ipc_path = f"/tmp/animeiat-cli-ipc-{slug}-{ep}.sock"
+            ipc_path = f"/tmp/animeiat-cli-ipc-{safe_slug}-{ep}.sock"
         fs_arg.append(f"--input-ipc-server={ipc_path}")
 
         prog = get_episode_progress(slug, ep, provider=provider)
