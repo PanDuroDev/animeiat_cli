@@ -194,7 +194,7 @@ def load_config():
             cfg = json.load(f)
             if "enabled_sources" in cfg and "search_priorities" not in cfg:
                 old = cfg.pop("enabled_sources")
-                cfg["search_priorities"] = [p for p in [0, 1, 2, 3, 4] if p in old]
+                cfg["search_priorities"] = [p for p in [0, 1] if p in old]
             for k, v in default_cfg.items():
                 if k not in cfg:
                     cfg[k] = v
@@ -279,9 +279,6 @@ def get_icon(name):
 PROVIDER_IDS = {
     0: "Anime3rb",
     1: "WitAnime",
-    2: "Anineko",
-    3: "HiAnime",
-    4: "9anime",
 }
 
 def get_provider_name(val):

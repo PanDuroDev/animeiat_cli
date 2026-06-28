@@ -85,84 +85,6 @@ async def _fetch_episodes_list_httpx(url, is_witanime, active_cookies=None):
                 if n is not None and h not in seen:
                     seen.add(h)
                     eps.append({"episode": n, "page_url": normalize(h, base_url=url)})
-        elif is_witanime == 2:
-            for ep_div in soup.find_all("a", class_="nv-info-episode-main"):
-                ep_href = (ep_div.get("href") or "").strip()
-                m = re.search(r'/ep-(\d+)$', ep_href)
-                if m:
-                    ep_num = int(m.group(1))
-                    if "/download/" in ep_href:
-                        ep_href = ep_href.replace("/download/", "/watch/")
-                    eps.append({"episode": ep_num, "page_url": normalize(ep_href, base_url=url)})
-            if not eps:
-                for a in soup.find_all("a", href=True):
-                    h = a["href"].strip()
-                    m = re.search(r'/ep-(\d+)$', h)
-                    if m and "/watch/" in h:
-                        ep_num = int(m.group(1))
-                        eps.append({"episode": ep_num, "page_url": normalize(h, base_url=url)})
-        elif is_witanime == 3:
-            anime_id = None
-            slug = extract_slug(url)
-            m = re.search(r'data-id\s*=\s*["\'](\d+)["\']', html)
-            if m:
-                anime_id = m.group(1)
-            if not anime_id:
-                m = re.search(r'let\s+id\s*=\s*(\d+)', html)
-                if m:
-                    anime_id = m.group(1)
-            if not anime_id:
-                m = re.search(r'/watch/[^/]+-(\d+)', url)
-                if m:
-                    anime_id = m.group(1)
-            if not anime_id:
-                script_tag = soup.find("script", text=re.compile(r'anime_id'))
-                if not script_tag:
-                    script_tag = soup.find("script", text=re.compile(r'"id"'))
-                if script_tag and script_tag.string:
-                    m = re.search(r'anime_id\s*=\s*["\']?(\d+)["\']?', script_tag.string)
-                    if m:
-                        anime_id = m.group(1)
-            if anime_id:
-                api_url = f"https://hianime.dk/ajax/episode/list/{anime_id}"
-                async with httpx.AsyncClient(timeout=15.0) as c2:
-                    ar = await c2.get(api_url, headers=headers)
-                if ar.status_code == 200:
-                    data = ar.json()
-                    html_str = data.get("result", "")
-                    if html_str:
-                        ep_soup = BeautifulSoup(str(html_str), "lxml")
-                        for a in ep_soup.select("a.ssl-item.ep-item, a[class*='ep-item']"):
-                            ep_num_text = a.text.strip()
-                            m = re.search(r'(\d+)', ep_num_text)
-                            if m:
-                                ep_num = int(m.group(1))
-                                if slug:
-                                    ep_page_url = normalize(f"/watch/{slug}/ep-{ep_num}", base_url="https://hianime.dk")
-                                else:
-                                    ep_page_url = normalize(a.get("href", "#"), base_url="https://hianime.dk")
-                                eps.append({"episode": ep_num, "page_url": ep_page_url})
-            if not eps:
-                seen = set()
-                for a in soup.select("a.ssl-item.ep-item, a[class*='ep-item'], div[class*='ep-item'] a"):
-                    h = a.get("href", "").strip()
-                    ep_num_text = a.text.strip()
-                    m = re.search(r'(\d+)', ep_num_text)
-                    if m:
-                        ep_num = int(m.group(1))
-                        if h and h != "#" and h not in seen:
-                            seen.add(h)
-                            eps.append({"episode": ep_num, "page_url": normalize(h, base_url=url)})
-        elif is_witanime == 4:
-            seen = set()
-            for a in soup.find_all("a", href=True):
-                h = a["href"].strip()
-                if "/watch/" in h and slug in h:
-                    ep_text = a.text.strip()
-                    m = re.search(r'(\d+)', ep_text)
-                    if m and h not in seen:
-                        seen.add(h)
-                        eps.append({"episode": int(m.group(1)), "page_url": normalize(h, base_url=url)})
         if not eps:
             return None, "No episodes found via httpx"
         eps.sort(key=lambda x: x["episode"])
@@ -273,83 +195,6 @@ async def _scrape_one_stream_httpx(ep_item, is_witanime, active_cookies=None):
                                     resolved = m.group(1)
                     except Exception:
                         pass
-        elif is_witanime == 2:
-            soup = BeautifulSoup(html, "lxml")
-            embed_urls = []
-            for el in soup.find_all(attrs={"data-video": True}):
-                url_candidate = el.get("data-video", "").strip()
-                if url_candidate.startswith("http"):
-                    embed_urls.append(url_candidate)
-            if not embed_urls:
-                for iframe in soup.find_all("iframe", src=True):
-                    src = iframe["src"].strip()
-                    if src.startswith("http"):
-                        embed_urls.append(src)
-            headers["Referer"] = url
-            for embed_url in embed_urls:
-                try:
-                    async with httpx.AsyncClient(timeout=15.0, follow_redirects=True, verify=_get_verify_ssl()) as c2:
-                        er = await c2.get(embed_url, headers=headers)
-                    if er.status_code == 200:
-                        ehtml = er.text
-                        patterns = [
-                            r'<video[^>]*src=["\']([^"\']+)["\']',
-                            r'<source[^>]*src=["\']([^"\']+\.(?:mp4|m3u8))["\']',
-                            r'(https?://[^"\'<>]+\.(?:mp4|m3u8)[^"\'<>]*)',
-                            r'file:\s*["\']([^"\']+)["\']',
-                            r'src:\s*["\']([^"\']+)["\']',
-                        ]
-                        for pat in patterns:
-                            m = re.search(pat, ehtml)
-                            if m:
-                                resolved = m.group(1)
-                                break
-                        if resolved:
-                            break
-                except Exception:
-                    continue
-        elif is_witanime == 3:
-            soup = BeautifulSoup(html, "lxml")
-            m = re.search(r'(https?://[^"\'<>]+\.(?:mp4|m3u8)[^"\'<>]*)', html)
-            if m:
-                resolved = m.group(1)
-            if not resolved:
-                for iframe in soup.find_all("iframe", src=True):
-                    iframe_src = iframe["src"]
-                    if iframe_src.startswith("http"):
-                        try:
-                            async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as c2:
-                                ir = await c2.get(iframe_src, headers=headers)
-                            if ir.status_code == 200:
-                                ihtml = ir.text
-                                m = re.search(r'(https?://[^"\'<>]+\.(?:mp4|m3u8)[^"\'<>]*)', ihtml)
-                                if m:
-                                    resolved = m.group(1)
-                        except Exception:
-                            pass
-                    if resolved:
-                        break
-        elif is_witanime == 4:
-            soup = BeautifulSoup(html, "lxml")
-            m = re.search(r'(https?://[^"\'<>]+\.(?:mp4|m3u8)[^"\'<>]*)', html)
-            if m:
-                resolved = m.group(1)
-            if not resolved:
-                for iframe in soup.find_all("iframe", src=True):
-                    iframe_src = iframe["src"]
-                    if iframe_src.startswith("http"):
-                        try:
-                            async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as c2:
-                                ir = await c2.get(iframe_src, headers=headers)
-                            if ir.status_code == 200:
-                                ihtml = ir.text
-                                m = re.search(r'(https?://[^"\'<>]+\.(?:mp4|m3u8)[^"\'<>]*)', ihtml)
-                                if m:
-                                    resolved = m.group(1)
-                        except Exception:
-                            pass
-                    if resolved:
-                        break
     except Exception as e:
         print(f"[animeiat-cli] Warning: stream scrape failed: {e}")
     return resolved
@@ -401,9 +246,7 @@ async def fetch_episodes_list_async(url, is_witanime, active_cookies=None):
                 await page.goto(url, wait_until="domcontentloaded")
 
                 success = False
-                extra_wait = 2.0 if is_witanime == 3 else 0.0
-                await asyncio.sleep(extra_wait)
-                for _ in range(35 if is_witanime == 4 else 25):
+                for _ in range(25):
                     title = await page.title()
                     if "Just a moment" not in title and "Attention Required" not in title:
                         if is_witanime == 1:
@@ -412,18 +255,6 @@ async def fetch_episodes_list_async(url, is_witanime, active_cookies=None):
                                 break
                         elif is_witanime == 0:
                             if await page.locator("a[href*='/episode/']").count() > 0:
-                                success = True
-                                break
-                        elif is_witanime == 2:
-                            if await page.locator("#episode_page").count() > 0 or await page.locator("a[href*='/episode']").count() > 0:
-                                success = True
-                                break
-                        elif is_witanime == 3:
-                            if await page.locator("#episodes-content .ssl-item.ep-item").count() > 0 or await page.locator("a[href*='/watch/']").count() > 0:
-                                success = True
-                                break
-                        elif is_witanime == 4:
-                            if await page.locator("a[href*='/watch/']").count() > 0:
                                 success = True
                                 break
                         else:
@@ -473,49 +304,6 @@ async def fetch_episodes_list_async(url, is_witanime, active_cookies=None):
                                 "episode": n,
                                 "page_url": normalize(h, base_url=url)
                             })
-                elif is_witanime == 2:
-                    for ep_div in soup.find_all("a", class_="nv-info-episode-main"):
-                        ep_href = (ep_div.get("href") or "").strip()
-                        m = re.search(r'/ep-(\d+)$', ep_href)
-                        if m:
-                            ep_num = int(m.group(1))
-                            if "/download/" in ep_href:
-                                ep_href = ep_href.replace("/download/", "/watch/")
-                            eps.append({"episode": ep_num, "page_url": normalize(ep_href, base_url=url)})
-                    if not eps:
-                        for a in soup.find_all("a", href=True):
-                            h = a["href"].strip()
-                            m = re.search(r'/ep-(\d+)$', h)
-                            if m and "/watch/" in h:
-                                ep_num = int(m.group(1))
-                                eps.append({"episode": ep_num, "page_url": normalize(h, base_url=url)})
-                elif is_witanime == 3:
-                    seen = set()
-                    for a in soup.select("a.ssl-item.ep-item, a[class*='ep-item'], div[class*='ep-item'] a"):
-                        h = a.get("href", "").strip()
-                        ep_num_text = a.text.strip()
-                        m = re.search(r'(\d+)', ep_num_text)
-                        if m:
-                            ep_num = int(m.group(1))
-                            if slug:
-                                ep_page_url = normalize(f"/watch/{slug}/ep-{ep_num}", base_url=url)
-                            elif h and h != "#" and h not in seen:
-                                ep_page_url = normalize(h, base_url=url)
-                            else:
-                                continue
-                            if ep_page_url not in seen:
-                                seen.add(ep_page_url)
-                                eps.append({"episode": ep_num, "page_url": ep_page_url})
-                elif is_witanime == 4:
-                    seen = set()
-                    for a in soup.find_all("a", href=True):
-                        h = a["href"].strip()
-                        if "/watch/" in h and slug.replace('-', '') in h.replace('-', ''):
-                            ep_text = a.text.strip()
-                            m = re.search(r'(\d+)', ep_text)
-                            if m and h not in seen:
-                                seen.add(h)
-                                eps.append({"episode": int(m.group(1)), "page_url": normalize(h, base_url=url)})
 
                 eps.sort(key=lambda x: x["episode"])
                 await browser.close()
@@ -702,118 +490,6 @@ async def scrape_one_stream_async(browser, ep_item, is_witanime, active_cookies,
 
             if not resolved_stream and media_requests:
                 resolved_stream = media_requests[0]
-        elif is_witanime == 2:
-            status_dict[ep_num] = {"status": "Finding player...", "color": "yellow", "quality": "-"}
-            await asyncio.sleep(2.0)
-            try:
-                embed_urls = await page.evaluate("""() => {
-                    const els = document.querySelectorAll('[data-video]');
-                    return Array.from(els).map(el => el.getAttribute('data-video')).filter(u => u && u.startsWith('http'));
-                }""")
-                if not embed_urls:
-                    iframe_src = await page.locator("iframe[src*='//']").first.get_attribute("src")
-                    if iframe_src and iframe_src.startswith("http"):
-                        embed_urls = [iframe_src]
-                for embed_url in embed_urls:
-                    player_page = await context.new_page()
-                    try:
-                        p_media = []
-                        player_page.on("request", lambda r: p_media.append(r.url) if (
-                            r.resource_type == "media" or ".mp4" in r.url.lower() or ".m3u8" in r.url.lower()
-                        ) and not r.url.lower().startswith("blob:") and not r.url.lower().startswith("data:") else None)
-                        await player_page.goto(embed_url, wait_until="load")
-                        await asyncio.sleep(3.0)
-                        if p_media:
-                            resolved_stream = select_best_stream(p_media)
-                        else:
-                            v_src = await player_page.evaluate("() => document.querySelector('video') ? document.querySelector('video').src : null")
-                            if v_src and not v_src.startswith("blob:") and not v_src.startswith("data:"):
-                                resolved_stream = v_src
-                    finally:
-                        await player_page.close()
-                    if resolved_stream:
-                        break
-            except Exception:
-                if media_requests:
-                    resolved_stream = select_best_stream(media_requests)
-        elif is_witanime == 3:
-            status_dict[ep_num] = {"status": "Finding servers...", "color": "yellow", "quality": "-"}
-            await asyncio.sleep(3.0)
-            try:
-                srv_buttons = page.locator(".server-item a.btn[data-link-id], a.server-item[data-link-id], button.server-item")
-                srv_count = await srv_buttons.count()
-                if srv_count == 0:
-                    srv_buttons = page.locator("[data-link-id]")
-                    srv_count = await srv_buttons.count()
-                for i in range(srv_count):
-                    try:
-                        await srv_buttons.nth(i).click()
-                        await asyncio.sleep(3.0)
-                        if media_requests:
-                            resolved_stream = select_best_stream(media_requests)
-                            break
-                    except Exception:
-                        pass
-            except Exception:
-                pass
-            if not resolved_stream:
-                try:
-                    v_src = await page.evaluate("() => document.querySelector('video') ? document.querySelector('video').src : null")
-                    if v_src and not v_src.startswith("blob:") and not v_src.startswith("data:"):
-                        resolved_stream = v_src
-                except Exception:
-                    pass
-            if not resolved_stream:
-                try:
-                    iframe = await page.locator("iframe[src*='//']").first.get_attribute("src")
-                    if iframe and iframe.startswith("http"):
-                        player_page = await context.new_page()
-                        try:
-                            await player_page.goto(iframe, wait_until="load")
-                            await asyncio.sleep(3.0)
-                            p_media = []
-                            player_page.on("request", lambda r: p_media.append(r.url) if (
-                                r.resource_type == "media" or ".mp4" in r.url.lower() or ".m3u8" in r.url.lower()
-                            ) and not r.url.lower().startswith("blob:") and not r.url.lower().startswith("data:") else None)
-                            await asyncio.sleep(3.0)
-                            if p_media:
-                                resolved_stream = select_best_stream(p_media)
-                        finally:
-                            await player_page.close()
-                except Exception:
-                    pass
-        elif is_witanime == 4:
-            status_dict[ep_num] = {"status": "Extracting stream...", "color": "yellow", "quality": "-"}
-            await asyncio.sleep(2.0)
-            if media_requests:
-                resolved_stream = select_best_stream(media_requests)
-            if not resolved_stream:
-                try:
-                    v_src = await page.evaluate("() => document.querySelector('video') ? document.querySelector('video').src : null")
-                    if v_src and not v_src.startswith("blob:") and not v_src.startswith("data:"):
-                        resolved_stream = v_src
-                except Exception:
-                    pass
-            if not resolved_stream:
-                try:
-                    iframe = await page.locator("iframe[src*='//']").first.get_attribute("src")
-                    if iframe and iframe.startswith("http"):
-                        player_page = await context.new_page()
-                        try:
-                            await player_page.goto(iframe, wait_until="load")
-                            await asyncio.sleep(3.0)
-                            p_media = []
-                            player_page.on("request", lambda r: p_media.append(r.url) if (
-                                r.resource_type == "media" or ".mp4" in r.url.lower() or ".m3u8" in r.url.lower()
-                            ) and not r.url.lower().startswith("blob:") and not r.url.lower().startswith("data:") else None)
-                            await asyncio.sleep(3.0)
-                            if p_media:
-                                resolved_stream = select_best_stream(p_media)
-                        finally:
-                            await player_page.close()
-                except Exception:
-                    pass
-
     except Exception as e:
         status_dict[ep_num] = {"status": f"Failed: {e}", "color": "red", "quality": "-"}
     finally:

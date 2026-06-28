@@ -573,9 +573,9 @@ def get_context_panel(context_type, selected_idx, options, metadata=None):
 
         desc = ""
         if selected_idx == 0:
-            desc = "Search for anime series across multiple streaming sources (Anime3rb, WitAnime, Anineko, HiAnime) in real-time."
+            desc = "Search for anime series across multiple streaming sources (Anime3rb, WitAnime) in real-time."
         elif selected_idx == 1:
-            desc = "Directly play an anime URL from any supported source (Anime3rb, WitAnime, Anineko, HiAnime) without performing a search."
+            desc = "Directly play an anime URL from any supported source (Anime3rb, WitAnime) without performing a search."
         elif selected_idx == 2:
             desc = "Browse your bookmarked library of shows, view history, and resume playing."
         elif selected_idx == 3:
@@ -1489,7 +1489,7 @@ def _handle_search_input(current, stack, ctx):
         stack.pop()
         return True
     add_search_history(query)
-    priorities = cfg.get("search_priorities", [0, 1, 2])
+    priorities = cfg.get("search_priorities", [0, 1])
     active_providers = [p for p in provider_registry.get_all() if p.provider_id in priorities]
     source_names = [p.provider_name for p in active_providers]
     with _centered_status(f"Searching {', '.join(source_names)}...", icon="search"):
@@ -1646,7 +1646,7 @@ def _handle_url_input(current, stack, ctx):
             with _centered_status("Searching...", icon="search"):
                 try:
                     cfg_s = load_config()
-                    priorities = cfg_s.get("search_priorities", [0, 1, 2])
+                    priorities = cfg_s.get("search_priorities", [0, 1])
                     from src.providers import search_all_providers as _search_all
                     from src.config import PROVIDER_IDS as _PID
                     raw = _run_async(_search_all(search_query, provider_ids=priorities, priorities=priorities))
@@ -2480,9 +2480,6 @@ def _handle_continue_watching(current, stack, ctx):
     _PROVIDER_URL_PATTERNS = [
         "https://anime3rb.com/titles/{slug}",
         "https://witanime.bond/anime/{slug}",
-        "https://anitaku.to/category/{slug}",
-        "https://hianime.to/watch/{slug}",
-        "https://9anime.to/watch/{slug}",
     ]
     items = []
     for slug, last_watched, provider in rows:

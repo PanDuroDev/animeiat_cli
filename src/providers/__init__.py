@@ -180,7 +180,6 @@ def detect_provider(url: str) -> Optional["SourceProvider"]:
     domain_map: dict[str, list[str]] = {
         "anime3rb": ["anime3rb.com", "anime3rb"],
         "witanime": ["witanime"],
-        "anineko": ["anineko.to", "anineko", "anitaku", "gogoanime"],
     }
 
     for p in registry.get_all():
@@ -193,8 +192,8 @@ def detect_provider(url: str) -> Optional["SourceProvider"]:
 
 
 def _load_providers() -> None:
-    from src.providers import anime3rb, witanime, anineko
-    for mod in (anime3rb, witanime, anineko):
+    from src.providers import anime3rb, witanime
+    for mod in (anime3rb, witanime):
         mod._register_provider(registry)
 
 

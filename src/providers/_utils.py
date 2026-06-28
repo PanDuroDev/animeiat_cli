@@ -12,18 +12,11 @@ def detect_provider_from_url(url):
     for pattern, provider_id in [
         ("anime3rb.com", 0), ("www.anime3rb.com", 0),
         ("witanime.bond", 1), ("www.witanime.bond", 1),
-        ("anitaku.to", 2), ("www.anitaku.to", 2),
-        ("gogoanime.cl", 2), ("gogoanime.bz", 2),
-        ("anineko.to", 2), ("www.anineko.to", 2),
-        ("hianime.to", 3), ("www.hianime.to", 3),
-        ("9anime.to", 4), ("www.9anime.to", 4),
     ]:
         if domain == pattern:
             return provider_id
     for pattern, provider_id in [
         ("anime3rb", 0), ("witanime", 1),
-        ("anitaku", 2), ("gogoanime", 2), ("anineko", 2),
-        ("hianime", 3), ("9anime", 4),
     ]:
         if pattern in netloc:
             return provider_id
@@ -76,18 +69,7 @@ def extract_slug(url):
         if m: return m.group(1)
         m = re.search(r"/episode/(.+?)-[\u0600-\u06FF]+-\d+", path)
         if m: return m.group(1)
-    elif "anitaku" in netloc or "gogoanime" in netloc or "anineko" in netloc:
-        m = re.search(r"/watch/([^/#?]+)", path)
-        if m:
-            slug = m.group(1)
-            slug = re.sub(r'/ep-\d+$', '', slug)
-            return slug
-    elif "hianime" in netloc:
-        m = re.search(r"/watch/([^/#?]+)", path)
-        if m: return m.group(1)
-    elif "9anime" in netloc:
-        m = re.search(r"/watch/([^/#?]+)", path)
-        if m: return m.group(1)
+
 
     return None
 

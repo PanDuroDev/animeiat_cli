@@ -206,7 +206,7 @@ def _read_cookies(user_data_path, decrypted_key, is_gcm):
             cursor = conn.cursor()
             try:
                 cursor.execute(
-                    "SELECT name, encrypted_value, host_key FROM cookies WHERE host_key LIKE '%anime3rb.com%' OR host_key LIKE '%vid3rb.com%' OR host_key LIKE '%witanime%' OR host_key LIKE '%anineko%' OR host_key LIKE '%gogoanime%' OR host_key LIKE '%hianime%' OR host_key LIKE '%9anime%'"
+                    "SELECT name, encrypted_value, host_key FROM cookies WHERE host_key LIKE '%anime3rb.com%' OR host_key LIKE '%vid3rb.com%' OR host_key LIKE '%witanime%'"
                 )
             except sqlite3.OperationalError:
                 continue
