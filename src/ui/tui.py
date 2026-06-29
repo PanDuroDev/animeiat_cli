@@ -160,8 +160,16 @@ def read_key():
             if ch in ('\r', '\n'): return KEY_ENTER
             if ch == ' ': return KEY_SPACE
             if ch in ('\x08', '\x7f'): return '\x08'
-            if ch == '\x1b': return KEY_ESC
             if ch == '\x03': return KEY_CTRL_C
+            if ch == '\x1b':
+                seq = ch
+                while msvcrt.kbhit() and len(seq) < 6:
+                    seq += msvcrt.getwch()
+                    if seq[-1].isalpha() or seq[-1] == '~':
+                        break
+                if seq == '\x1b[A': return KEY_UP
+                if seq == '\x1b[B': return KEY_DOWN
+                return KEY_ESC
             if ch in ('a', 'A'): return KEY_A
             if len(ch) == 1:
                 return ch
