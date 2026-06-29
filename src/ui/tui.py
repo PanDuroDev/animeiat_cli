@@ -1132,6 +1132,7 @@ def interactive_priority_list(labels, current_order):
                         if _should_sync():
                             sys.stdout.write("\033[?2026l")
                 _sync_update()
+                flush_input_buffer()
                 while True:
                     key = read_key()
                     if key in ("q", "esc"):
