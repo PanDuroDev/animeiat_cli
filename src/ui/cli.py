@@ -33,7 +33,7 @@ from src.providers._cookies import get_preferred_cookies
 from src.providers._scraper import fetch_episodes_list_async, scrape_multiple_streams_async
 
 from src.ui.tui import (
-    clear_screen, enter_alt_screen, exit_alt_screen, run_app,
+    clear_screen, run_app,
 )
 
 
@@ -291,7 +291,6 @@ def main():
     player_override = args.player if args.player else None
     quality_override = args.quality if args.quality else None
 
-    enter_alt_screen()
     try:
         run_app(initial_url=args.url, player_override=player_override, quality_override=quality_override)
     except Exception as e:

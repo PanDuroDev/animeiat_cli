@@ -1100,32 +1100,43 @@ def interactive_priority_list(labels, current_order):
             auto_refresh=False,
             vertical_overflow="visible",
         )
-        with live:
-            while True:
-                live.update(make_panel())
-                key = read_key()
-                if key in ("q", "esc"):
-                    return None
-                elif key == "enter":
-                    return order
-                elif key in ("up", "k", "K"):
-                    selected_idx = max(0, selected_idx - 1)
-                elif key in ("down", "j", "J"):
-                    selected_idx = min(len(order) - 1, selected_idx + 1)
-                elif key in ("u", "U"):
-                    if selected_idx > 0:
-                        order[selected_idx], order[selected_idx - 1] = order[selected_idx - 1], order[selected_idx]
-                        selected_idx -= 1
-                        _notify = f"Moved {labels[order[selected_idx]]} up"
-                    else:
-                        _notify = "Already at top"
-                elif key in ("d", "D"):
-                    if selected_idx < len(order) - 1:
-                        order[selected_idx], order[selected_idx + 1] = order[selected_idx + 1], order[selected_idx]
-                        selected_idx += 1
-                        _notify = f"Moved {labels[order[selected_idx]]} down"
-                    else:
-                        _notify = "Already at bottom"
+        with RawModeContext():
+            with live:
+                def _sync_update():
+                    try:
+                        sys.stdout.write("\033[?2026h")
+                        live.update(make_panel())
+                    finally:
+                        sys.stdout.write("\033[?2026l")
+                _sync_update()
+                while True:
+                    key = read_key()
+                    if key in ("q", "esc"):
+                        return None
+                    elif key == "enter":
+                        return order
+                    elif key in ("up", "k", "K"):
+                        selected_idx = max(0, selected_idx - 1)
+                        _sync_update()
+                    elif key in ("down", "j", "J"):
+                        selected_idx = min(len(order) - 1, selected_idx + 1)
+                        _sync_update()
+                    elif key in ("u", "U"):
+                        if selected_idx > 0:
+                            order[selected_idx], order[selected_idx - 1] = order[selected_idx - 1], order[selected_idx]
+                            selected_idx -= 1
+                            _notify = f"Moved {labels[order[selected_idx]]} up"
+                        else:
+                            _notify = "Already at top"
+                        _sync_update()
+                    elif key in ("d", "D"):
+                        if selected_idx < len(order) - 1:
+                            order[selected_idx], order[selected_idx + 1] = order[selected_idx + 1], order[selected_idx]
+                            selected_idx += 1
+                            _notify = f"Moved {labels[order[selected_idx]]} down"
+                        else:
+                            _notify = "Already at bottom"
+                        _sync_update()
     finally:
         if sys.stdout.isatty():
             sys.stdout.write("\033[?25h")
