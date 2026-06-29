@@ -69,7 +69,7 @@ def run_noninteractive(initial_url, player_override=None, quality_override=None,
 
     anime_url = initial_url.strip()
     p = urlparse(anime_url)
-    is_witanime = detect_provider_from_url(anime_url)
+    provider = detect_provider_from_url(anime_url)
     slug = extract_slug(anime_url)
     if not slug:
         sys.exit(_emit({"error": f"Could not extract slug from URL: {anime_url}", "success": False}, exit_code=1))
@@ -84,7 +84,7 @@ def run_noninteractive(initial_url, player_override=None, quality_override=None,
     if not json_output:
         print("Fetching episodes list...")
     try:
-        eps, err = asyncio.run(fetch_episodes_list_async(anime_url, is_witanime, active_cookies))
+        eps, err = asyncio.run(fetch_episodes_list_async(anime_url, provider, active_cookies))
     except Exception as exc:
         sys.exit(_emit({"error": f"Fetch failed: {exc}", "success": False}, exit_code=1))
 
@@ -109,7 +109,7 @@ def run_noninteractive(initial_url, player_override=None, quality_override=None,
         msg = f"Scraping stream URLs for {len(eps_to_scrape)} episode(s)..."
         print(msg)
     try:
-        results = asyncio.run(scrape_multiple_streams_async(eps_to_scrape, is_witanime, active_cookies))
+        results = asyncio.run(scrape_multiple_streams_async(eps_to_scrape, provider, active_cookies))
     except KeyboardInterrupt:
         sys.exit(_emit({"error": "Scraping cancelled.", "success": False}, exit_code=1))
     except Exception as exc:
@@ -190,21 +190,21 @@ def run_noninteractive(initial_url, player_override=None, quality_override=None,
 
     launch_success = False
     if player_name == "MPV":
-        launch_success = play_with_mpv(stream_urls, slug=slug, ep=eps_to_scrape[0]["episode"], provider=is_witanime)
+        launch_success = play_with_mpv(stream_urls, slug=slug, ep=eps_to_scrape[0]["episode"], provider=provider)
     elif player_name == "VLC":
-        launch_success = play_with_vlc(stream_urls, slug=slug, ep=eps_to_scrape[0]["episode"], provider=is_witanime)
+        launch_success = play_with_vlc(stream_urls, slug=slug, ep=eps_to_scrape[0]["episode"], provider=provider)
     elif player_name == "IINA":
-        launch_success = play_with_iina(stream_urls, slug=slug, ep=eps_to_scrape[0]["episode"], provider=is_witanime)
+        launch_success = play_with_iina(stream_urls, slug=slug, ep=eps_to_scrape[0]["episode"], provider=provider)
     elif player_name == "Celluloid":
-        launch_success = play_with_celluloid(stream_urls, slug=slug, ep=eps_to_scrape[0]["episode"], provider=is_witanime)
+        launch_success = play_with_celluloid(stream_urls, slug=slug, ep=eps_to_scrape[0]["episode"], provider=provider)
     elif player_name == "Haruna":
-        launch_success = play_with_haruna(stream_urls, slug=slug, ep=eps_to_scrape[0]["episode"], provider=is_witanime)
+        launch_success = play_with_haruna(stream_urls, slug=slug, ep=eps_to_scrape[0]["episode"], provider=provider)
 
     if launch_success:
         if not json_output:
             print(f"Playback started in {player_name} with {len(stream_urls)} stream(s).")
         for ep_num in [ep["episode"] for ep in eps_to_scrape]:
-            add_watch_history(slug, ep_num, slug, provider=is_witanime)
+            add_watch_history(slug, ep_num, slug, provider=provider)
         sys.exit(_emit({"success": True, "player": player_name, "streams": len(stream_urls)}, exit_code=0))
     else:
         for s in stream_urls:

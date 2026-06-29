@@ -4,13 +4,14 @@ from urllib.parse import quote_plus
 import httpx
 from bs4 import BeautifulSoup
 
+from . import ProviderId
 from ._scraper import (
     _fetch_episodes_list_httpx, _scrape_one_stream_httpx,
     _scrape_one_stream_playwright, fetch_episodes_list_async,
 )
 from ._utils import _classify_stream_quality, _is_cloudflare_challenge, normalize
 
-PROVIDER_ID = 0
+PROVIDER_ID = ProviderId.ANIME3RB
 PROVIDER_NAME = "Anime3rb"
 
 
@@ -70,17 +71,17 @@ class Anime3rbProvider:
         return [{"title": t, "url": u} for t, u in results]
 
     async def fetch_episodes(self, url: str) -> list[dict]:
-        eps, err = await _fetch_episodes_list_httpx(url, 0)
+        eps, err = await _fetch_episodes_list_httpx(url, ProviderId.ANIME3RB)
         if eps is not None:
             return eps
-        eps, err = await fetch_episodes_list_async(url, 0)
+        eps, err = await fetch_episodes_list_async(url, ProviderId.ANIME3RB)
         return eps or []
 
     async def _resolve(self, episode_url: str, cookies=None):
-        stream = await _scrape_one_stream_httpx({"episode": 0, "page_url": episode_url}, 0, cookies)
+        stream = await _scrape_one_stream_httpx({"episode": 0, "page_url": episode_url}, ProviderId.ANIME3RB, cookies)
         if stream:
             return {"url": stream, "quality": _classify_stream_quality(stream)}
-        stream = await _scrape_one_stream_playwright({"episode": 0, "page_url": episode_url}, 0, cookies)
+        stream = await _scrape_one_stream_playwright({"episode": 0, "page_url": episode_url}, ProviderId.ANIME3RB, cookies)
         if stream:
             return {"url": stream, "quality": _classify_stream_quality(stream)}
         return None

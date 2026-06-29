@@ -6,6 +6,7 @@ import time
 import threading
 
 from src.db import save_episode_progress
+from src.providers import ProviderId
 
 
 _stop_event = threading.Event()
@@ -15,13 +16,13 @@ def stop_progress_tracking():
     _stop_event.set()
 
 
-def start_progress_tracking(slug, episode, player_ipc_path, provider=0):
+def start_progress_tracking(slug, episode, player_ipc_path, provider=ProviderId.ANIME3RB):
     stop_progress_tracking()
     _stop_event.clear()
     threading.Thread(target=poll_mpv_progress, args=(player_ipc_path, slug, episode, provider), daemon=True).start()
 
 
-def poll_mpv_progress(ipc_path, slug, ep, provider=0):
+def poll_mpv_progress(ipc_path, slug, ep, provider=ProviderId.ANIME3RB):
     client = None
     max_retries = 8
     connect_warned = False

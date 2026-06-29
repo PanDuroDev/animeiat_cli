@@ -3,24 +3,25 @@ import socket
 from urllib.parse import urlparse
 
 from src.config import load_config, THEME
+from src.providers import ProviderId
 
 
 def detect_provider_from_url(url):
     p = urlparse(url.strip())
     netloc = p.netloc.lower()
     domain = netloc.split(":")[0]
-    for pattern, provider_id in [
-        ("anime3rb.com", 0), ("www.anime3rb.com", 0),
-        ("witanime.bond", 1), ("www.witanime.bond", 1),
+    for pattern, pid in [
+        ("anime3rb.com", ProviderId.ANIME3RB), ("www.anime3rb.com", ProviderId.ANIME3RB),
+        ("witanime.bond", ProviderId.WITANIME), ("www.witanime.bond", ProviderId.WITANIME),
     ]:
         if domain == pattern:
-            return provider_id
-    for pattern, provider_id in [
-        ("anime3rb", 0), ("witanime", 1),
+            return pid
+    for pattern, pid in [
+        ("anime3rb", ProviderId.ANIME3RB), ("witanime", ProviderId.WITANIME),
     ]:
         if pattern in netloc:
-            return provider_id
-    return 0
+            return pid
+    return ProviderId.ANIME3RB
 
 
 def validate_url(url):

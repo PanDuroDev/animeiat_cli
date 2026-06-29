@@ -15,6 +15,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from src.config import THEME, console, get_icon, load_config
+from . import ProviderId
 from ._utils import (
     _classify_stream_quality, _get_ua, _is_cloudflare_challenge,
     extract_slug, normalize, select_best_stream,
@@ -35,7 +36,7 @@ def _select_scraping_method(cfg=None):
     return cfg.get("scraping_method", "auto")
 
 
-async def _fetch_episodes_list_httpx(url, is_witanime, active_cookies=None):
+async def _fetch_episodes_list_httpx(url, provider, active_cookies=None):
     slug = extract_slug(url)
     if not slug:
         return None, "Cannot extract slug from URL."
@@ -58,7 +59,7 @@ async def _fetch_episodes_list_httpx(url, is_witanime, active_cookies=None):
             return None, "Cloudflare challenge detected"
         soup = BeautifulSoup(html, "lxml")
         eps = []
-        if is_witanime == 1:
+        if provider == ProviderId.WITANIME:
             cards = soup.find_all("div", class_="episodes-card")
             for idx, card in enumerate(cards):
                 title_anchor = card.find("h3").find("a") if card.find("h3") else None
@@ -76,7 +77,7 @@ async def _fetch_episodes_list_httpx(url, is_witanime, active_cookies=None):
                 m = re.search(r'\d+', text)
                 ep_num = int(m.group(0)) if m else (idx + 1)
                 eps.append({"episode": ep_num, "page_url": ep_url})
-        elif is_witanime == 0:
+        elif provider == ProviderId.ANIME3RB:
             seen = set()
             for a in soup.find_all("a", href=True):
                 h = a["href"].strip()
@@ -93,7 +94,7 @@ async def _fetch_episodes_list_httpx(url, is_witanime, active_cookies=None):
         return None, str(e)
 
 
-async def _scrape_one_stream_httpx(ep_item, is_witanime, active_cookies=None):
+async def _scrape_one_stream_httpx(ep_item, provider, active_cookies=None):
     ep_num = ep_item["episode"]
     url = ep_item["page_url"]
     cookies_dict = {}
@@ -114,7 +115,7 @@ async def _scrape_one_stream_httpx(ep_item, is_witanime, active_cookies=None):
         if _is_cloudflare_challenge(html):
             return None
         resolved = None
-        if is_witanime == 1:
+        if provider == ProviderId.WITANIME:
             soup = BeautifulSoup(html, "lxml")
             server_links = soup.find_all("a", class_="server-link")
             candidates = []
@@ -158,7 +159,7 @@ async def _scrape_one_stream_httpx(ep_item, is_witanime, active_cookies=None):
                 except Exception:
                     continue
             resolved = select_best_stream(candidates) if candidates else None
-        elif is_witanime == 0:
+        elif provider == ProviderId.ANIME3RB:
             soup = BeautifulSoup(html, "lxml")
             iframe = soup.find("iframe", src=re.compile(r"(vid3rb\.com|player)"))
             if iframe:
@@ -200,10 +201,10 @@ async def _scrape_one_stream_httpx(ep_item, is_witanime, active_cookies=None):
     return resolved
 
 
-async def fetch_episodes_list_async(url, is_witanime, active_cookies=None):
+async def fetch_episodes_list_async(url, provider, active_cookies=None):
     method = _select_scraping_method()
     if method in ("auto", "alternative_only"):
-        eps, err = await _fetch_episodes_list_httpx(url, is_witanime, active_cookies)
+        eps, err = await _fetch_episodes_list_httpx(url, provider, active_cookies)
         if eps is not None:
             return eps, err
         if method == "alternative_only":
@@ -249,11 +250,11 @@ async def fetch_episodes_list_async(url, is_witanime, active_cookies=None):
                 for _ in range(25):
                     title = await page.title()
                     if "Just a moment" not in title and "Attention Required" not in title:
-                        if is_witanime == 1:
+                        if provider == ProviderId.WITANIME:
                             if await page.locator("div.episodes-card").count() > 0:
                                 success = True
                                 break
-                        elif is_witanime == 0:
+                        elif provider == ProviderId.ANIME3RB:
                             if await page.locator("a[href*='/episode/']").count() > 0:
                                 success = True
                                 break
@@ -270,7 +271,7 @@ async def fetch_episodes_list_async(url, is_witanime, active_cookies=None):
                 soup = BeautifulSoup(html, "lxml")
                 eps = []
 
-                if is_witanime == 1:
+                if provider == ProviderId.WITANIME:
                     cards = soup.find_all("div", class_="episodes-card")
                     for idx, card in enumerate(cards):
                         title_anchor = card.find("h3").find("a") if card.find("h3") else None
@@ -292,7 +293,7 @@ async def fetch_episodes_list_async(url, is_witanime, active_cookies=None):
                             "episode": ep_num,
                             "page_url": ep_url
                         })
-                elif is_witanime == 0:
+                elif provider == ProviderId.ANIME3RB:
                     seen = set()
                     for a in soup.find_all("a", href=True):
                         h = a["href"].strip()
@@ -315,7 +316,7 @@ async def fetch_episodes_list_async(url, is_witanime, active_cookies=None):
         return [], str(e)
 
 
-async def scrape_one_stream_async(browser, ep_item, is_witanime, active_cookies, results_dict, status_dict):
+async def scrape_one_stream_async(browser, ep_item, provider, active_cookies, results_dict, status_dict):
     ep_num = ep_item["episode"]
     url = ep_item["page_url"]
 
@@ -364,7 +365,7 @@ async def scrape_one_stream_async(browser, ep_item, is_witanime, active_cookies,
                 break
             await asyncio.sleep(1.0)
 
-        if is_witanime == 1:
+        if provider == ProviderId.WITANIME:
             status_dict[ep_num] = {"status": "Selecting server...", "color": "yellow", "quality": "-"}
             await page.wait_for_selector("a.server-link", timeout=12000)
             server_links = page.locator("a.server-link")
@@ -446,7 +447,7 @@ async def scrape_one_stream_async(browser, ep_item, is_witanime, active_cookies,
 
                     if resolved_stream:
                         break
-        elif is_witanime == 0:
+        elif provider == ProviderId.ANIME3RB:
             status_dict[ep_num] = {"status": "Extracting source...", "color": "yellow", "quality": "-"}
 
             cfg = load_config()
@@ -504,7 +505,7 @@ async def scrape_one_stream_async(browser, ep_item, is_witanime, active_cookies,
         status_dict[ep_num] = {"status": f"Failed {get_icon('cross').strip()}", "color": "red", "quality": "-"}
 
 
-async def scrape_multiple_streams_async(ep_items, is_witanime, active_cookies):
+async def scrape_multiple_streams_async(ep_items, provider, active_cookies):
     results = {}
     status_dict = {}
     for ep in ep_items:
@@ -571,7 +572,7 @@ async def scrape_multiple_streams_async(ep_items, is_witanime, active_cookies):
             need_playwright.append(ep)
             status_dict[en] = {"status": "Pending...", "color": "gray", "quality": "-"}
         else:
-            stream = await _scrape_one_stream_httpx(ep, is_witanime, active_cookies)
+            stream = await _scrape_one_stream_httpx(ep, provider, active_cookies)
             if stream:
                 results[en] = stream
                 quality = "FHD/1080p" if any(q in stream.lower() for q in ["1080p", "fhd", "w1080p"]) else "HD/720p" if any(q in stream.lower() for q in ["720p", "hd"]) else "SD/480p" if "480p" in stream.lower() else "Auto"
@@ -606,7 +607,7 @@ async def scrape_multiple_streams_async(ep_items, is_witanime, active_cookies):
 
                     tasks = []
                     for ep in need_playwright:
-                        tasks.append(scrape_one_stream_async(browser, ep, is_witanime, active_cookies, results, status_dict))
+                        tasks.append(scrape_one_stream_async(browser, ep, provider, active_cookies, results, status_dict))
 
                     with Live(make_scraping_table(), refresh_per_second=5, transient=False) as live:
                         async def update_display():
@@ -632,7 +633,7 @@ async def scrape_multiple_streams_async(ep_items, is_witanime, active_cookies):
     return results
 
 
-async def _scrape_one_stream_playwright(ep_item, is_witanime, active_cookies=None):
+async def _scrape_one_stream_playwright(ep_item, provider, active_cookies=None):
     for attempt in range(2):
         try:
             async with async_playwright() as p:
@@ -646,7 +647,7 @@ async def _scrape_one_stream_playwright(ep_item, is_witanime, active_cookies=Non
                 )
                 results = {}
                 status = {}
-                await scrape_one_stream_async(browser, ep_item, is_witanime, active_cookies, results, status)
+                await scrape_one_stream_async(browser, ep_item, provider, active_cookies, results, status)
                 await browser.close()
                 ep_num = ep_item["episode"]
                 return results.get(ep_num)

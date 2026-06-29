@@ -5,6 +5,7 @@ Stream cache implementation — SQLite-backed storage for resolved stream URLs.
 import time
 
 from src.db import get_db_connection, _db_write_lock
+from src.providers import ProviderId
 
 # Bump this when URL format changes to invalidate all old caches
 CACHE_VERSION = 2
@@ -14,7 +15,7 @@ def _cache_key(slug, provider):
     return f"{slug}_{provider}_v{CACHE_VERSION}"
 
 
-def cache_stream_url(slug, episode, stream_url, quality="", provider=0):
+def cache_stream_url(slug, episode, stream_url, quality="", provider=ProviderId.ANIME3RB):
     with _db_write_lock:
         slug_key = _cache_key(slug, provider)
         conn = None
@@ -33,7 +34,7 @@ def cache_stream_url(slug, episode, stream_url, quality="", provider=0):
                 conn.close()
 
 
-def get_cached_stream_url(slug, episode, provider=0, max_age_hours=24):
+def get_cached_stream_url(slug, episode, provider=ProviderId.ANIME3RB, max_age_hours=24):
     slug_key = _cache_key(slug, provider)
     conn = None
     try:
@@ -56,7 +57,7 @@ def get_cached_stream_url(slug, episode, provider=0, max_age_hours=24):
     return None
 
 
-def clear_stream_cache(slug=None, max_age_hours=24, provider=0):
+def clear_stream_cache(slug=None, max_age_hours=24, provider=ProviderId.ANIME3RB):
     with _db_write_lock:
         conn = None
         try:

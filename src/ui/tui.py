@@ -35,6 +35,8 @@ from rich.text import Text
 from rich.markup import escape
 from rich import box as rich_box
 
+from src.providers import ProviderId
+
 from src.config import (
     APP_VERSION, THEME, console, get_icon, get_provider_name,
     get_config_dir, get_config_path, load_config, save_config,
@@ -1519,7 +1521,7 @@ def _handle_search_input(current, stack, ctx):
         stack.pop()
         return True
     add_search_history(query)
-    priorities = cfg.get("search_priorities", [0, 1])
+    priorities = cfg.get("search_priorities", [ProviderId.ANIME3RB, ProviderId.WITANIME])
     active_providers = [p for p in provider_registry.get_all() if p.provider_id in priorities]
     source_names = [p.provider_name for p in active_providers]
     with _centered_status(f"Searching {', '.join(source_names)}...", icon="search"):
@@ -1914,7 +1916,7 @@ def _settings_player(cfg, ctx):
 def _settings_search_sources(cfg):
     while True:
         scrap_method = cfg.get("scraping_method", "auto")
-        priorities = cfg.get("search_priorities", [0, 1])
+        priorities = cfg.get("search_priorities", [ProviderId.ANIME3RB, ProviderId.WITANIME])
         method_labels = {"auto": "Auto (httpx -> Playwright)", "playwright_only": "Playwright Only", "alternative_only": "httpx Only"}
         opts = [
             f"Search Source Priorities   (Current: {len(priorities)} providers)",
@@ -1929,7 +1931,7 @@ def _settings_search_sources(cfg):
             from src.config import PROVIDER_IDS as _PID
             all_ids = sorted(_PID.keys())
             provider_options = [f"{_PID[pid]} ({pid})" for pid in all_ids]
-            old_priorities = cfg.get("search_priorities", [0, 1])
+            old_priorities = cfg.get("search_priorities", [ProviderId.ANIME3RB, ProviderId.WITANIME])
             current_order = [p for p in old_priorities if p in all_ids]
             missing = [p for p in all_ids if p not in current_order]
             new_priorities = current_order + missing

@@ -12,6 +12,8 @@ import httpx
 from rich.console import Console
 from rich import box as rich_box
 
+from src.providers import ProviderId
+
 console = Console()
 
 _http_client = None
@@ -179,7 +181,7 @@ def load_config():
         "nerd_fonts": False,
         "verify_ssl": True,
         "scraping_method": "auto",
-        "search_priorities": [0, 1],
+        "search_priorities": [ProviderId.ANIME3RB, ProviderId.WITANIME],
         "search_history": [],
         "download_dir": "",
         "favorites": [],
@@ -194,7 +196,7 @@ def load_config():
             cfg = json.load(f)
             if "enabled_sources" in cfg and "search_priorities" not in cfg:
                 old = cfg.pop("enabled_sources")
-                cfg["search_priorities"] = [p for p in [0, 1] if p in old]
+                cfg["search_priorities"] = [p for p in [ProviderId.ANIME3RB, ProviderId.WITANIME] if p in old]
             for k, v in default_cfg.items():
                 if k not in cfg:
                     cfg[k] = v
@@ -277,15 +279,15 @@ def get_icon(name):
 
 
 PROVIDER_IDS = {
-    0: "Anime3rb",
-    1: "WitAnime",
+    ProviderId.ANIME3RB: "Anime3rb",
+    ProviderId.WITANIME: "WitAnime",
 }
 
 def get_provider_name(val):
-    return PROVIDER_IDS.get(int(val), "Unknown")
+    return PROVIDER_IDS.get(ProviderId(int(val)) if isinstance(val, int) else val, "Unknown")
 
 def get_provider_id(name):
     for k, v in PROVIDER_IDS.items():
         if v == name:
             return k
-    return 0
+    return ProviderId.ANIME3RB

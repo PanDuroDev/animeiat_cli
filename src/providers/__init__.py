@@ -3,6 +3,7 @@ import difflib
 import re
 import sys
 import time
+from enum import IntEnum
 from typing import Any, Optional, Protocol
 from urllib.parse import urlparse
 
@@ -10,8 +11,13 @@ _search_cache: dict[tuple[str, tuple[int, ...]], tuple[float, dict[int, list[dic
 _SEARCH_CACHE_TTL = 300
 
 
+class ProviderId(IntEnum):
+    ANIME3RB = 0
+    WITANIME = 1
+
+
 class SourceProvider(Protocol):
-    provider_id: int
+    provider_id: ProviderId
     provider_name: str
 
     async def search(self, query: str) -> list[dict[str, Any]]:
@@ -31,12 +37,12 @@ class SourceProvider(Protocol):
 
 class ProviderRegistry:
     def __init__(self) -> None:
-        self._providers: dict[int, SourceProvider] = {}
+        self._providers: dict[ProviderId, SourceProvider] = {}
 
     def register(self, provider: SourceProvider) -> None:
         self._providers[provider.provider_id] = provider
 
-    def get(self, provider_id: int) -> Optional[SourceProvider]:
+    def get(self, provider_id: ProviderId) -> Optional[SourceProvider]:
         return self._providers.get(provider_id)
 
     def get_all(self) -> list[SourceProvider]:
@@ -134,9 +140,9 @@ def search_providers_for_media(title):
 
 async def search_all_providers(
     query: str,
-    provider_ids: list[int] | None = None,
-    priorities: list[int] | None = None,
-) -> dict[int, list[dict[str, Any]]]:
+    provider_ids: list[ProviderId] | None = None,
+    priorities: list[ProviderId] | None = None,
+) -> dict[ProviderId, list[dict[str, Any]]]:
     providers = registry.get_all()
     if provider_ids is not None:
         providers = [p for p in providers if p.provider_id in provider_ids]

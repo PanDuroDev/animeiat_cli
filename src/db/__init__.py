@@ -12,6 +12,7 @@ import time
 import httpx
 
 from src.config import get_config_dir, get_config_path, load_config, get_http_client
+from src.providers import ProviderId
 
 _db_write_lock = threading.Lock()
 
@@ -262,7 +263,7 @@ def migrate_json_to_sqlite():
             conn.close()
 
 
-def save_episode_progress(slug, ep, time_pos, duration, provider=0):
+def save_episode_progress(slug, ep, time_pos, duration, provider=ProviderId.ANIME3RB):
     with _db_write_lock:
         conn = None
         try:
@@ -280,7 +281,7 @@ def save_episode_progress(slug, ep, time_pos, duration, provider=0):
                 conn.close()
 
 
-def get_episode_progress(slug, ep, provider=0):
+def get_episode_progress(slug, ep, provider=ProviderId.ANIME3RB):
     conn = None
     try:
         conn = get_db_connection()
@@ -362,7 +363,7 @@ def get_all_favorites():
             conn.close()
 
 
-def get_all_episode_progress(slug, provider=0):
+def get_all_episode_progress(slug, provider=ProviderId.ANIME3RB):
     conn = None
     try:
         conn = get_db_connection()
@@ -469,7 +470,7 @@ def update_download_status(slug, episode, status, file_path=""):
                 conn.close()
 
 
-def add_watch_history(slug, episode_num, anime_title=None, provider=0):
+def add_watch_history(slug, episode_num, anime_title=None, provider=ProviderId.ANIME3RB):
     cfg = load_config()
     if not cfg.get("history_tracking", True):
         return
@@ -492,7 +493,7 @@ def add_watch_history(slug, episode_num, anime_title=None, provider=0):
     sync_watch_progress_bg(slug, anime_title, episode_num)
 
 
-def get_watch_history(slug, provider=0):
+def get_watch_history(slug, provider=ProviderId.ANIME3RB):
     conn = None
     try:
         conn = get_db_connection()

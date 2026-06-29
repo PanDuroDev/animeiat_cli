@@ -2,6 +2,7 @@ import os
 import re
 import subprocess
 
+from ..providers import ProviderId
 from .discovery import get_cached_players, _get_player_cfg
 from .progress import start_progress_tracking
 from ..config import load_config
@@ -22,7 +23,7 @@ def _launch(cmd, name="player", platform_flags=True):
         return False
 
 
-def play(stream_urls, player="mpv", slug=None, episode=None, extra_args=None, provider=0):
+def play(stream_urls, player="mpv", slug=None, episode=None, extra_args=None, provider=ProviderId.ANIME3RB):
     if player == "mpv":
         return play_with_mpv(stream_urls, slug=slug, ep=episode, extra_args=extra_args, provider=provider)
     elif player == "vlc":
@@ -36,7 +37,7 @@ def play(stream_urls, player="mpv", slug=None, episode=None, extra_args=None, pr
     return False
 
 
-def play_with_vlc(stream_urls, extra_args=None, slug=None, ep=None, provider=0):
+def play_with_vlc(stream_urls, extra_args=None, slug=None, ep=None, provider=ProviderId.ANIME3RB):
     vlc_path = get_cached_players().get("vlc")
     if not vlc_path:
         return False
@@ -52,7 +53,7 @@ def play_with_vlc(stream_urls, extra_args=None, slug=None, ep=None, provider=0):
     return _launch([vlc_path] + fs_arg + user_args + stream_urls, "VLC")
 
 
-def play_with_mpv(stream_urls, slug=None, ep=None, extra_args=None, provider=0):
+def play_with_mpv(stream_urls, slug=None, ep=None, extra_args=None, provider=ProviderId.ANIME3RB):
     mpv_path = get_cached_players().get("mpv")
     if not mpv_path:
         return False
@@ -77,7 +78,7 @@ def play_with_mpv(stream_urls, slug=None, ep=None, extra_args=None, provider=0):
     return ok
 
 
-def play_with_iina(stream_urls, extra_args=None, slug=None, ep=None, provider=0):
+def play_with_iina(stream_urls, extra_args=None, slug=None, ep=None, provider=ProviderId.ANIME3RB):
     iina_path = get_cached_players().get("iina")
     if not iina_path:
         return False
@@ -93,7 +94,7 @@ def play_with_iina(stream_urls, extra_args=None, slug=None, ep=None, provider=0)
     return _launch([iina_path] + fs_arg + user_args + stream_urls, "IINA", platform_flags=False)
 
 
-def play_with_celluloid(stream_urls, extra_args=None, slug=None, ep=None, provider=0):
+def play_with_celluloid(stream_urls, extra_args=None, slug=None, ep=None, provider=ProviderId.ANIME3RB):
     celluloid_path = get_cached_players().get("celluloid")
     if not celluloid_path:
         return False
@@ -109,7 +110,7 @@ def play_with_celluloid(stream_urls, extra_args=None, slug=None, ep=None, provid
     return _launch([celluloid_path] + fs_arg + user_args + stream_urls, "Celluloid", platform_flags=False)
 
 
-def play_with_haruna(stream_urls, extra_args=None, slug=None, ep=None, provider=0):
+def play_with_haruna(stream_urls, extra_args=None, slug=None, ep=None, provider=ProviderId.ANIME3RB):
     haruna_path = get_cached_players().get("haruna")
     if not haruna_path:
         return False
