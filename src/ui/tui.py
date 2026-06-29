@@ -115,6 +115,17 @@ KEY_UNKNOWN = "unknown"
 _in_raw_mode = False
 _raw_fd = None
 
+_use_sync_output = None
+
+def _should_sync():
+    global _use_sync_output
+    if _use_sync_output is None:
+        if os.name == 'nt':
+            _use_sync_output = bool(os.environ.get('WT_SESSION'))
+        else:
+            _use_sync_output = bool(os.environ.get('TERM_PROGRAM')) or os.environ.get('TERM') not in (None, 'dumb', 'unknown')
+    return _use_sync_output
+
 
 class RawModeContext:
     def __enter__(self):
@@ -926,10 +937,10 @@ def interactive_select(options, title="Select Option", context_type=None, metada
                 def _sync_update(renderable=None):
                     if renderable is None:
                         renderable = make_panel()
-                    try:
+                    if _should_sync():
                         sys.stdout.write("\033[?2026h")
-                        live.update(renderable)
-                    finally:
+                    live.update(renderable)
+                    if _should_sync():
                         sys.stdout.write("\033[?2026l")
                 _sync_update()
                 while True:
@@ -1110,12 +1121,16 @@ def interactive_priority_list(labels, current_order):
         )
         with RawModeContext():
             with live:
-                def _sync_update():
-                    try:
+                def _sync_update(renderable=None):
+                    if renderable is None:
+                        renderable = make_panel()
+                    if _should_sync():
                         sys.stdout.write("\033[?2026h")
-                        live.update(make_panel())
+                    try:
+                        live.update(renderable)
                     finally:
-                        sys.stdout.write("\033[?2026l")
+                        if _should_sync():
+                            sys.stdout.write("\033[?2026l")
                 _sync_update()
                 while True:
                     key = read_key()
@@ -1320,11 +1335,13 @@ def interactive_checklist(options, title="Select Episodes", default_start_idx=0,
                 def _sync_update(renderable=None):
                     if renderable is None:
                         renderable = make_panel()
-                    try:
+                    if _should_sync():
                         sys.stdout.write("\033[?2026h")
+                    try:
                         live.update(renderable)
                     finally:
-                        sys.stdout.write("\033[?2026l")
+                        if _should_sync():
+                            sys.stdout.write("\033[?2026l")
                 _sync_update()
                 while True:
                     key = read_key()
@@ -2634,5 +2651,6 @@ def run_app(initial_url=None, player_override=None, quality_override=None):
                 break
 
     stop_progress_tracking()
-    sys.stdout.write("\033[?2026l")
+    if _should_sync():
+        sys.stdout.write("\033[?2026l")
     sys.stdout.flush()

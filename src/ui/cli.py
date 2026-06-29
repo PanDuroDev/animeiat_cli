@@ -44,7 +44,11 @@ def _show_cursor():
 
 
 def _reset_terminal():
-    sys.stdout.write("\033[?2026l\033[?1049l\033[?25h\033[0m")
+    out = ""
+    if os.name != 'nt' or os.environ.get('WT_SESSION'):
+        out += "\033[?2026l"
+    out += "\033[?1049l\033[?25h\033[0m"
+    sys.stdout.write(out)
     sys.stdout.flush()
 
 
