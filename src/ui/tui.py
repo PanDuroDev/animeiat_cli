@@ -1113,14 +1113,8 @@ def interactive_priority_list(labels, current_order):
 
             return Align(panel, align="center", vertical="middle", height=height)
 
-        live = Live(
-            make_panel(),
-            screen=True,
-            auto_refresh=False,
-            vertical_overflow="visible",
-        )
         with RawModeContext():
-            with live:
+            with Live(None, refresh_per_second=_REFRESH_RATE, transient=False) as live:
                 def _sync_update(renderable=None):
                     if renderable is None:
                         renderable = make_panel()
@@ -1132,7 +1126,6 @@ def interactive_priority_list(labels, current_order):
                         if _should_sync():
                             sys.stdout.write("\033[?2026l")
                 _sync_update()
-                flush_input_buffer()
                 while True:
                     key = read_key()
                     if key in ("q", "esc"):
