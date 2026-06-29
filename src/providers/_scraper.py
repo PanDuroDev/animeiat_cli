@@ -564,22 +564,29 @@ async def scrape_multiple_streams_async(ep_items, provider, active_cookies):
         )
 
     method = _select_scraping_method()
+    httpx_sem = asyncio.Semaphore(5)
     need_playwright = []
-    for ep in ep_items:
+    ep_items_list = list(ep_items)
+
+    async def _try_httpx(ep):
         en = ep["episode"]
         status_dict[en] = {"status": "Trying httpx...", "color": "cyan", "quality": "-"}
-        if method == "playwright_only":
+        async with httpx_sem:
+            stream = await _scrape_one_stream_httpx(ep, provider, active_cookies)
+        if stream:
+            results[en] = stream
+            quality = "FHD/1080p" if any(q in stream.lower() for q in ["1080p", "fhd", "w1080p"]) else "HD/720p" if any(q in stream.lower() for q in ["720p", "hd"]) else "SD/480p" if "480p" in stream.lower() else "Auto"
+            status_dict[en] = {"status": f"Resolved {get_icon('check').strip()}", "color": "green", "quality": quality}
+        else:
             need_playwright.append(ep)
             status_dict[en] = {"status": "Pending...", "color": "gray", "quality": "-"}
-        else:
-            stream = await _scrape_one_stream_httpx(ep, provider, active_cookies)
-            if stream:
-                results[en] = stream
-                quality = "FHD/1080p" if any(q in stream.lower() for q in ["1080p", "fhd", "w1080p"]) else "HD/720p" if any(q in stream.lower() for q in ["720p", "hd"]) else "SD/480p" if "480p" in stream.lower() else "Auto"
-                status_dict[en] = {"status": f"Resolved {get_icon('check').strip()}", "color": "green", "quality": quality}
-            else:
-                need_playwright.append(ep)
-                status_dict[en] = {"status": "Pending...", "color": "gray", "quality": "-"}
+
+    if method == "playwright_only":
+        need_playwright = ep_items_list
+        for ep in ep_items_list:
+            status_dict[ep["episode"]] = {"status": "Pending...", "color": "gray", "quality": "-"}
+    else:
+        await asyncio.gather(*[_try_httpx(ep) for ep in ep_items_list])
 
     if need_playwright:
         if method == "alternative_only":
@@ -605,9 +612,13 @@ async def scrape_multiple_streams_async(ep_items, provider, active_cookies):
                             status_dict[ep["episode"]] = {"status": f"Failed: {msg}", "color": "red", "quality": "-"}
                         return results
 
-                    tasks = []
-                    for ep in need_playwright:
-                        tasks.append(scrape_one_stream_async(browser, ep, provider, active_cookies, results, status_dict))
+                    pw_sem = asyncio.Semaphore(3)
+
+                    async def _scrape_one(ep):
+                        async with pw_sem:
+                            await scrape_one_stream_async(browser, ep, provider, active_cookies, results, status_dict)
+
+                    tasks = [_scrape_one(ep) for ep in need_playwright]
 
                     with Live(make_scraping_table(), refresh_per_second=5, transient=False) as live:
                         async def update_display():
