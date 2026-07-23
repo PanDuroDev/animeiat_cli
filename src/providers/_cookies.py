@@ -7,8 +7,6 @@ import subprocess
 import sys
 import tempfile
 
-from src.config import load_config
-
 _cookie_warn_count = {}
 _key_cache = {}
 
@@ -247,6 +245,7 @@ def _read_cookies(user_data_path, decrypted_key, is_gcm):
 
 
 def get_preferred_cookies():
+    from src.config import load_config
     cfg = load_config()
     pref = cfg.get("preferred_browser", "auto")
     if pref == "chrome":

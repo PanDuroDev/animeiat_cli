@@ -264,6 +264,8 @@ def migrate_json_to_sqlite():
 
 
 def save_episode_progress(slug, ep, time_pos, duration, provider=ProviderId.ANIME3RB):
+    from src.log_util import log
+    log("DB", f"save_progress: slug={slug}, ep={ep}, pos={time_pos}, dur={duration}")
     with _db_write_lock:
         conn = None
         try:

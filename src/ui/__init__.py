@@ -2,77 +2,37 @@
 UI layer for animeiat-cli — TUI components and CLI entry points.
 """
 
-from .tui import (
+from ._core import (
     detect_layout_mode,
-    KEY_UP,
-    KEY_DOWN,
-    KEY_ENTER,
-    KEY_SPACE,
-    KEY_ESC,
-    KEY_CTRL_C,
-    KEY_A,
-    KEY_UNKNOWN,
-    RawModeContext,
-    read_key,
-    flush_input_buffer,
-    clear_screen,
-    enter_alt_screen,
-    exit_alt_screen,
-    set_terminal_title,
-    print_hotkey_guide,
-    UPDATE_CHECK_URL,
-    _update_cache,
-    check_for_update,
-    TRACK_DEFAULTS,
-    _show_track_selector,
-    get_context_panel,
-    _show_help_panel,
-    interactive_select,
-    interactive_checklist,
-    _handle_main_menu,
-    _handle_search_input,
-    _try_open_episodes,
-    _browse_platform_list,
-    _handle_search_results,
-    _handle_url_input,
-    _handle_favorites,
-    _handle_settings,
-    _settings_player,
-    _settings_search_sources,
-    _settings_data_sync,
-    _settings_appearance,
-    _settings_config_dir,
-    _settings_about,
-    _handle_episode_selection,
-    _handle_export,
-    _handle_download_manager,
-    _STATE_HANDLERS,
-    run_app,
+    KEY_UP, KEY_DOWN, KEY_ENTER, KEY_SPACE, KEY_ESC, KEY_CTRL_C, KEY_A, KEY_UNKNOWN,
+    RawModeContext, read_key, flush_input_buffer,
+    clear_screen, enter_alt_screen, exit_alt_screen, set_terminal_title,
 )
+from ._widgets import (
+    print_hotkey_guide, check_for_update, _show_track_selector,
+    get_context_panel, _show_help_panel, interactive_select, interactive_checklist,
+)
+from ._handlers import (
+    _handle_main_menu, _handle_search_input, _try_open_episodes,
+    _browse_platform_list, _handle_search_results, _handle_url_input,
+    _handle_favorites, _handle_settings, _handle_episode_selection,
+    _handle_export, _handle_download_manager, _STATE_HANDLERS,
+)
+from ._settings import (
+    _settings_player, _settings_search_sources, _settings_data_sync,
+    _settings_appearance, _settings_config_dir, _settings_about,
+)
+from .tui import run_app
 
 # cli is imported lazily to avoid circular-import warnings with `python -m src.ui.cli`
 # Use `from src.ui.cli import main` explicitly when needed.
 
 __all__ = [
     "detect_layout_mode",
-    "KEY_UP",
-    "KEY_DOWN",
-    "KEY_ENTER",
-    "KEY_SPACE",
-    "KEY_ESC",
-    "KEY_CTRL_C",
-    "KEY_A",
-    "KEY_UNKNOWN",
-    "RawModeContext",
-    "read_key",
-    "flush_input_buffer",
-    "clear_screen",
-    "enter_alt_screen",
-    "exit_alt_screen",
-    "set_terminal_title",
-    "print_hotkey_guide",
-    "check_for_update",
-    "interactive_select",
-    "interactive_checklist",
-    "run_app",
+    "KEY_UP", "KEY_DOWN", "KEY_ENTER", "KEY_SPACE", "KEY_ESC",
+    "KEY_CTRL_C", "KEY_A", "KEY_UNKNOWN",
+    "RawModeContext", "read_key", "flush_input_buffer",
+    "clear_screen", "enter_alt_screen", "exit_alt_screen", "set_terminal_title",
+    "print_hotkey_guide", "check_for_update", "interactive_select",
+    "interactive_checklist", "run_app",
 ]

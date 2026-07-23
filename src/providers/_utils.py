@@ -2,7 +2,6 @@ import re
 import socket
 from urllib.parse import urlparse
 
-from src.config import load_config, THEME
 from src.providers import ProviderId
 
 
@@ -21,7 +20,7 @@ def detect_provider_from_url(url):
     ]:
         if pattern in netloc:
             return pid
-    return ProviderId.ANIME3RB
+    return None
 
 
 def validate_url(url):
@@ -70,8 +69,6 @@ def extract_slug(url):
         if m: return m.group(1)
         m = re.search(r"/episode/(.+?)-[\u0600-\u06FF]+-\d+", path)
         if m: return m.group(1)
-
-
     return None
 
 
@@ -92,6 +89,7 @@ def select_best_stream(urls):
     if not urls:
         return None
 
+    from src.config import load_config
     cfg = load_config()
     pref_quality = cfg.get("default_quality", "auto")
 

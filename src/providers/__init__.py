@@ -3,17 +3,13 @@ import difflib
 import re
 import sys
 import time
-from enum import IntEnum
 from typing import Any, Optional, Protocol
 from urllib.parse import urlparse
 
+from ._ids import ProviderId
+
 _search_cache: dict[tuple[str, tuple[int, ...]], tuple[float, dict[int, list[dict[str, Any]]]]] = {}
 _SEARCH_CACHE_TTL = 300
-
-
-class ProviderId(IntEnum):
-    ANIME3RB = 0
-    WITANIME = 1
 
 
 class SourceProvider(Protocol):

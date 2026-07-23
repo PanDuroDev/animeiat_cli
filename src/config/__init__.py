@@ -12,9 +12,12 @@ import httpx
 from rich.console import Console
 from rich import box as rich_box
 
-from src.providers import ProviderId
+from src.providers._ids import ProviderId
 
 console = Console()
+console._sync_output = False
+if os.name == 'nt':
+    console._is_legacy_windows = True
 
 _http_client = None
 def get_http_client():
@@ -178,6 +181,7 @@ def load_config():
         "history_tracking": True,
         "fullscreen": True,
         "custom_player_args": "",
+        "auto_play_next": False,
         "nerd_fonts": False,
         "verify_ssl": True,
         "scraping_method": "auto",
@@ -211,6 +215,8 @@ def load_config():
 
 
 def save_config(cfg):
+    from src.log_util import log
+    log("CONFIG", "config saved")
     global _config_cache, _nerd_fonts_enabled
     _config_cache = cfg
     _nerd_fonts_enabled = cfg.get("nerd_fonts", False)

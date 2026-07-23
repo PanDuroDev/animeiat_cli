@@ -14,7 +14,7 @@ from rich.live import Live
 from rich.panel import Panel
 from rich.table import Table
 
-from src.config import THEME, console, get_icon, load_config
+from src.log_util import log
 from . import ProviderId
 from ._utils import (
     _classify_stream_quality, _get_ua, _is_cloudflare_challenge,
@@ -27,11 +27,13 @@ _verify_ssl = None
 def _get_verify_ssl():
     global _verify_ssl
     if _verify_ssl is None:
+        from src.config import load_config
         _verify_ssl = load_config().get("verify_ssl", True)
     return _verify_ssl
 
 def _select_scraping_method(cfg=None):
     if cfg is None:
+        from src.config import load_config
         cfg = load_config()
     return cfg.get("scraping_method", "auto")
 
@@ -59,6 +61,8 @@ async def _fetch_episodes_list_httpx(url, provider, active_cookies=None):
             return None, "Cloudflare challenge detected"
         soup = BeautifulSoup(html, "lxml")
         eps = []
+        if provider is None:
+            return None, "URL not recognized as a supported provider"
         if provider == ProviderId.WITANIME:
             cards = soup.find_all("div", class_="episodes-card")
             for idx, card in enumerate(cards):
@@ -175,6 +179,7 @@ async def _scrape_one_stream_httpx(ep_item, provider, active_cookies=None):
                             m = re.search(r'(?:var|let|const)\s+video_sources\s*=\s*(\[\s*\{[\s\S]*?\}\s*\])\s*;', phtml)
                             if m:
                                 sources = json.loads(m.group(1))
+                                from src.config import load_config
                                 cfg = load_config()
                                 pref_q = cfg.get("default_quality", "auto")
                                 if pref_q == "720p":
@@ -202,6 +207,10 @@ async def _scrape_one_stream_httpx(ep_item, provider, active_cookies=None):
 
 
 async def fetch_episodes_list_async(url, provider, active_cookies=None):
+    log("SCRAPE", f"fetch_episodes_list: url={url}, provider={provider}")
+    if provider is None:
+        log("ERROR", f"unrecognized URL: {url}")
+        return [], "Unrecognized URL — not a supported provider"
     method = _select_scraping_method()
     if method in ("auto", "alternative_only"):
         eps, err = await _fetch_episodes_list_httpx(url, provider, active_cookies)
@@ -317,6 +326,7 @@ async def fetch_episodes_list_async(url, provider, active_cookies=None):
 
 
 async def scrape_one_stream_async(browser, ep_item, provider, active_cookies, results_dict, status_dict):
+    from src.config import load_config, get_icon
     ep_num = ep_item["episode"]
     url = ep_item["page_url"]
 
@@ -506,6 +516,8 @@ async def scrape_one_stream_async(browser, ep_item, provider, active_cookies, re
 
 
 async def scrape_multiple_streams_async(ep_items, provider, active_cookies):
+    from src.config import THEME, get_icon
+    log("SCRAPE", f"scrape_multiple_streams: {len(ep_items)} items, provider={provider}")
     results = {}
     status_dict = {}
     for ep in ep_items:
@@ -620,7 +632,7 @@ async def scrape_multiple_streams_async(ep_items, provider, active_cookies):
 
                     tasks = [_scrape_one(ep) for ep in need_playwright]
 
-                    with Live(make_scraping_table(), refresh_per_second=5, transient=False) as live:
+                    with Live(make_scraping_table(), refresh_per_second=5, transient=True) as live:
                         async def update_display():
                             while True:
                                 await asyncio.sleep(1.0)

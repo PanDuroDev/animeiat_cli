@@ -3,6 +3,7 @@ import re
 import subprocess
 
 from ..providers import ProviderId
+from ..log_util import log
 from .discovery import get_cached_players, _get_player_cfg
 from .progress import start_progress_tracking
 from ..config import load_config
@@ -11,6 +12,7 @@ from ..db import get_episode_progress
 
 def _launch(cmd, name="player", platform_flags=True):
     try:
+        log("PLAYER", f"exec: {' '.join(cmd[:3])}... (truncated)")
         if platform_flags and os.name == 'nt':
             subprocess.Popen(cmd, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS)
         elif platform_flags:
@@ -19,6 +21,7 @@ def _launch(cmd, name="player", platform_flags=True):
             subprocess.Popen(cmd, start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return True
     except Exception as e:
+        log("ERROR", f"{name} launch failed: {e}")
         print(f"[animeiat-cli] Warning: {name} launch failed: {e}")
         return False
 
@@ -40,7 +43,9 @@ def play(stream_urls, player="mpv", slug=None, episode=None, extra_args=None, pr
 def play_with_vlc(stream_urls, extra_args=None, slug=None, ep=None, provider=ProviderId.ANIME3RB):
     vlc_path = get_cached_players().get("vlc")
     if not vlc_path:
+        log("PLAYER", "VLC launch skipped — player not found")
         return False
+    log("PLAYER", f"launching VLC: slug={slug}, ep={ep}")
     pcfg = _get_player_cfg()
     user_args = list(pcfg["custom_args"])
     if extra_args:
@@ -56,7 +61,9 @@ def play_with_vlc(stream_urls, extra_args=None, slug=None, ep=None, provider=Pro
 def play_with_mpv(stream_urls, slug=None, ep=None, extra_args=None, provider=ProviderId.ANIME3RB):
     mpv_path = get_cached_players().get("mpv")
     if not mpv_path:
+        log("PLAYER", "MPV launch skipped — player not found")
         return False
+    log("PLAYER", f"launching MPV: slug={slug}, ep={ep}")
     is_mpvnet = "mpvnet" in os.path.basename(mpv_path).lower()
     pcfg = _get_player_cfg()
     user_args = list(pcfg["custom_args"])
@@ -81,7 +88,9 @@ def play_with_mpv(stream_urls, slug=None, ep=None, extra_args=None, provider=Pro
 def play_with_iina(stream_urls, extra_args=None, slug=None, ep=None, provider=ProviderId.ANIME3RB):
     iina_path = get_cached_players().get("iina")
     if not iina_path:
+        log("PLAYER", "IINA launch skipped — player not found")
         return False
+    log("PLAYER", f"launching IINA: slug={slug}, ep={ep}")
     pcfg = _get_player_cfg()
     user_args = list(pcfg["custom_args"])
     if extra_args:
@@ -97,7 +106,9 @@ def play_with_iina(stream_urls, extra_args=None, slug=None, ep=None, provider=Pr
 def play_with_celluloid(stream_urls, extra_args=None, slug=None, ep=None, provider=ProviderId.ANIME3RB):
     celluloid_path = get_cached_players().get("celluloid")
     if not celluloid_path:
+        log("PLAYER", "Celluloid launch skipped — player not found")
         return False
+    log("PLAYER", f"launching Celluloid: slug={slug}, ep={ep}")
     pcfg = _get_player_cfg()
     user_args = list(pcfg["custom_args"])
     if extra_args:
@@ -113,7 +124,9 @@ def play_with_celluloid(stream_urls, extra_args=None, slug=None, ep=None, provid
 def play_with_haruna(stream_urls, extra_args=None, slug=None, ep=None, provider=ProviderId.ANIME3RB):
     haruna_path = get_cached_players().get("haruna")
     if not haruna_path:
+        log("PLAYER", "Haruna launch skipped — player not found")
         return False
+    log("PLAYER", f"launching Haruna: slug={slug}, ep={ep}")
     pcfg = _get_player_cfg()
     user_args = list(pcfg["custom_args"])
     if extra_args:

@@ -11,6 +11,7 @@ import sys
 import traceback
 from urllib.parse import urlparse
 
+from src.log_util import log, shutdown as log_shutdown
 from src.config import (
     APP_VERSION, THEME, console, load_config, _config_cache,
 )
@@ -44,10 +45,7 @@ def _show_cursor():
 
 
 def _reset_terminal():
-    out = ""
-    if os.name != 'nt' or os.environ.get('WT_SESSION'):
-        out += "\033[?2026l"
-    out += "\033[?1049l\033[?25h\033[0m"
+    out = "\033[?1049l\033[?25h\033[0m"
     sys.stdout.write(out)
     sys.stdout.flush()
 
@@ -70,8 +68,10 @@ def run_noninteractive(initial_url, player_override=None, quality_override=None,
     anime_url = initial_url.strip()
     p = urlparse(anime_url)
     provider = detect_provider_from_url(anime_url)
+    log("INFO", f"non-interactive: url={anime_url}, player={player_override}, quality={quality_override}")
     slug = extract_slug(anime_url)
     if not slug:
+        log("ERROR", f"could not extract slug from: {anime_url}")
         sys.exit(_emit({"error": f"Could not extract slug from URL: {anime_url}", "success": False}, exit_code=1))
 
     if not json_output:
@@ -83,6 +83,7 @@ def run_noninteractive(initial_url, player_override=None, quality_override=None,
 
     if not json_output:
         print("Fetching episodes list...")
+    log("SCRAPE", f"fetching episodes: {slug}")
     try:
         eps, err = asyncio.run(fetch_episodes_list_async(anime_url, provider, active_cookies))
     except Exception as exc:
@@ -92,10 +93,12 @@ def run_noninteractive(initial_url, player_override=None, quality_override=None,
         sys.exit(_emit({"error": f"Fetch failed: {err}", "success": False}, exit_code=1))
 
     if not eps:
+        log("ERROR", "no episodes found")
         sys.exit(_emit({"error": "No episodes found.", "success": False}, exit_code=1))
 
     if list_episodes:
         ep_list = [{"episode": e["episode"], "page_url": e.get("page_url", "")} for e in eps]
+        log("INFO", f"listed {len(eps)} episodes")
         sys.exit(_emit({"slug": slug, "total_episodes": len(eps), "episodes": ep_list, "success": True}, exit_code=0))
 
     if not json_output:
@@ -263,6 +266,8 @@ def main():
             print(err) if not args.json else print(json.dumps({"error": err}))
             sys.exit(1)
 
+    log("INFO", f"CLI started — player={args.player}, quality={args.quality}, url={args.url}, no_tui={args.no_tui}, json={args.json}")
+
     if sys.stdout.encoding != 'utf-8':
         try:
             sys.stdout.reconfigure(encoding='utf-8')
@@ -298,10 +303,12 @@ def main():
     try:
         run_app(initial_url=args.url, player_override=player_override, quality_override=quality_override)
     except Exception as e:
+        log("ERROR", f"run_app crashed: {e}")
         traceback.print_exc()
         input("\nAn unexpected error occurred. Press Enter to exit...")
     finally:
         _reset_terminal()
+        log_shutdown()
 
 
 if __name__ == "__main__":

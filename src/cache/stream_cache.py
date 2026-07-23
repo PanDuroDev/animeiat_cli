@@ -67,7 +67,7 @@ def clear_stream_cache(slug=None, max_age_hours=24, provider=ProviderId.ANIME3RB
             if slug:
                 slug_key = _cache_key(slug, provider)
                 cursor.execute("DELETE FROM stream_cache WHERE slug = ? AND fetched_at < ?", (slug_key, cutoff))
-            elif provider:
+            elif provider is not None:
                 prov_pattern = f"%_{provider}_v{CACHE_VERSION}"
                 cursor.execute("DELETE FROM stream_cache WHERE slug LIKE ? AND fetched_at < ?", (prov_pattern, cutoff))
             else:

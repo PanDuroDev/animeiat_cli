@@ -6,10 +6,12 @@ import time
 import threading
 
 from src.db import save_episode_progress
+from src.log_util import log
 from src.providers import ProviderId
 
 
 _stop_event = threading.Event()
+_episode_finished = threading.Event()
 
 
 def stop_progress_tracking():
@@ -19,6 +21,7 @@ def stop_progress_tracking():
 def start_progress_tracking(slug, episode, player_ipc_path, provider=ProviderId.ANIME3RB):
     stop_progress_tracking()
     _stop_event.clear()
+    log("PROGRESS", f"start tracking: slug={slug}, ep={episode}, ipc={player_ipc_path}")
     threading.Thread(target=poll_mpv_progress, args=(player_ipc_path, slug, episode, provider), daemon=True).start()
 
 
@@ -159,6 +162,7 @@ def poll_mpv_progress(ipc_path, slug, ep, provider=ProviderId.ANIME3RB):
                 if dirty:
                     if duration and (time_pos / duration > 0.95):
                         save_episode_progress(slug, ep, 0, duration, provider=provider)
+                        _episode_finished.set()
                     else:
                         save_episode_progress(slug, ep, time_pos, duration or 0, provider=provider)
                     _last_saved_time_pos = time_pos

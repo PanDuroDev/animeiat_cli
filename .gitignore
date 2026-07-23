@@ -48,6 +48,7 @@ Desktop.ini
 *.swp
 *.swo
 *~
+New Text Document.txt
 
 # ── IDE / editors ──
 .vscode/
@@ -56,10 +57,11 @@ Desktop.ini
 *.sublime-workspace
 *.code-workspace
 
-# ── Dev tooling (local, not part of the project) ──
+# ── Dev tooling / AI (local, not part of the project) ──
 .opencode/
 .specify/
 AGENTS.md
+analysis-report.md
 
 # ── Design specs ──
 specs/
